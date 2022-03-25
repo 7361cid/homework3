@@ -43,15 +43,9 @@ class Field:
 
 
 class CharField(Field):
-    def __init__(self, required, nullable):
-        super(self).__init__(required=required, nullable=nullable)
-        if nullable:
-            self.value = None
-        else:
-            self.value = ""
+    def validate(self, value):
+        pass
 
-    def __setattr__(self, attrname, value):
-        self.__dict__[attrname] = value
 
 class ArgumentsField(Field):
     pass
