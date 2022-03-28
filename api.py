@@ -40,11 +40,21 @@ class Field:
     def __init__(self, required, nullable=False):
         self.required = required
         self.nullable = nullable
+        self.value = None
 
 
 class CharField(Field):
     def validate(self, value):
-        pass
+        if isinstance(value, str):
+            return True
+        else:
+            return False
+
+    def set_value(self, value):
+        if self.validate(value):
+            self.value = value
+        else:
+            raise ValueError
 
 
 class ArgumentsField(Field):
@@ -83,10 +93,21 @@ class ClientsInterestsRequest:
 class OnlineScoreRequest:
     first_name = CharField(required=False, nullable=True)
     last_name = CharField(required=False, nullable=True)
-    email = EmailField(required=False, nullable=True)
-    phone = PhoneField(required=False, nullable=True)
-    birthday = BirthDayField(required=False, nullable=True)
-    gender = GenderField(required=False, nullable=True)
+    init_complete = False
+#    email = EmailField(required=False, nullable=True)
+#    phone = PhoneField(required=False, nullable=True)
+#    birthday = BirthDayField(required=False, nullable=True)
+#    gender = GenderField(required=False, nullable=True)
+
+    def __init__(self, first_name, last_name):
+        self.first_name.set_value(first_name)
+        self.last_name.set_value(last_name)
+        self.init_complete = True
+
+    def __getattribute__(self, item):
+        if item == "first_name" and self.init_complete:
+            return object.__getattribute__(self, item).value
+        return object.__getattribute__(self, item)
 
 
 class MethodRequest:
@@ -161,6 +182,8 @@ class MainHTTPHandler(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
+    obj = OnlineScoreRequest("first", "second")
+    print(obj.first_name)
     op = OptionParser()
     op.add_option("-p", "--port", action="store", type=int, default=8080)
     op.add_option("-l", "--log", action="store", default=None)
