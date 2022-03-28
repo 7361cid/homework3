@@ -42,13 +42,8 @@ class Field:
         self.nullable = nullable
         self.value = None
 
-
-class CharField(Field):
     def validate(self, value):
-        if isinstance(value, str):
-            return True
-        else:
-            return False
+        return value
 
     def set_value(self, value):
         if self.validate(value):
@@ -57,28 +52,82 @@ class CharField(Field):
             raise ValueError
 
 
+class CharField(Field):
+    def validate(self, value):
+        if value is None and self.nullable:
+            return True
+        if isinstance(value, str):
+            return True
+        else:
+            return False
+
+
 class ArgumentsField(Field):
-    pass
+    def validate(self, value):
+        if self.value is None and self.nullable:
+            return True
+        if type(value) == dict:
+            try:
+                json.dumps(value)
+                return True
+            except json.JSONDecodeError:
+                return False
 
 
-class EmailField(CharField):
-    pass
+class EmailField(Field):
+    def validate(self, value):
+        if value is None and self.nullable:
+            return True
+        if isinstance(value, str) and '@' in value:
+            return True
+        else:
+            return False
 
 
 class PhoneField(Field):
-    pass
+    def validate(self, value):
+        if value is None and self.nullable:
+            return True
+        if isinstance(value, str) and len(value) == 11 and value[0] == "7" and value.isdigit():
+            return True
+        elif isinstance(value, int) and len(str(value)) == 11 and str(value)[0] == "7":
+            return True
+        else:
+            return False
 
 
 class DateField(Field):
-    pass
+    def validate(self, value):
+        if value is None and self.nullable:
+            return True
+        try:
+            datetime.datetime.strftime(value, '%d-%m-%Y')  # Check date formate
+            return True
+        except ValueError:
+            return False
 
 
-class BirthDayField(Field):
-    pass
+class BirthDayField(DateField):
+    def validate(self, value):
+        if super().validate(value=value):
+            now_date = datetime.datetime.today().__format__('%d-%m-%Y')
+            now_date = datetime.datetime.strptime(now_date, '%d-%m-%Y')
+            if now_date - value > datetime.timedelta(days=70*365):
+                return False
+            else:
+                return True
+        else:
+            return False
 
 
 class GenderField(Field):
-    pass
+    def validate(self, value):
+        if self.value is None and self.nullable:
+            return True
+        if value in [0, 1, 2]:
+            return True
+        else:
+            return False
 
 
 class ClientIDsField(Field):
@@ -91,21 +140,26 @@ class ClientsInterestsRequest:
 
 
 class OnlineScoreRequest:
+    init_complete = False
     first_name = CharField(required=False, nullable=True)
     last_name = CharField(required=False, nullable=True)
-    init_complete = False
-#    email = EmailField(required=False, nullable=True)
-#    phone = PhoneField(required=False, nullable=True)
-#    birthday = BirthDayField(required=False, nullable=True)
-#    gender = GenderField(required=False, nullable=True)
+    email = EmailField(required=False, nullable=True)
+    phone = PhoneField(required=False, nullable=True)
+    birthday = BirthDayField(required=False, nullable=True)
+    gender = GenderField(required=False, nullable=True)
 
-    def __init__(self, first_name, last_name):
+    def __init__(self, first_name, last_name, email, phone, birthday, gender):
         self.first_name.set_value(first_name)
         self.last_name.set_value(last_name)
+        self.email.set_value(email)
+        self.phone.set_value(phone)
+        self.birthday.set_value(birthday)
+        self.gender.set_value(gender)
         self.init_complete = True
 
     def __getattribute__(self, item):
-        if item == "first_name" and self.init_complete:
+        item_list = ["first_name", "last_name", "email", "phone", "birthday", "gender"]
+        if item in item_list and self.init_complete:
             return object.__getattribute__(self, item).value
         return object.__getattribute__(self, item)
 
@@ -182,8 +236,6 @@ class MainHTTPHandler(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
-    obj = OnlineScoreRequest("first", "second")
-    print(obj.first_name)
     op = OptionParser()
     op.add_option("-p", "--port", action="store", type=int, default=8080)
     op.add_option("-l", "--log", action="store", default=None)
