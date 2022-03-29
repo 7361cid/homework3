@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import abc
 import json
 import datetime
 import logging
@@ -9,6 +8,8 @@ import hashlib
 import uuid
 from optparse import OptionParser
 from http.server import HTTPServer, BaseHTTPRequestHandler
+
+from scoring import get_score
 
 SALT = "Otus"
 ADMIN_LOGIN = "admin"
@@ -61,6 +62,12 @@ class CharField(Field):
         else:
             return False
 
+    def __add__(self, other):
+        if isinstance(other, str):
+            self.value = self.value + other
+        elif isinstance(other, CharField):
+            self.value = self.value + other.value
+
 
 class ArgumentsField(Field):
     def validate(self, value):
@@ -101,7 +108,7 @@ class DateField(Field):
         if value is None and self.nullable:
             return True
         try:
-            datetime.datetime.strftime(value, '%d-%m-%Y')  # Check date formate
+            datetime.datetime.strftime(value, '%d.%m.%Y')
             return True
         except ValueError:
             return False
@@ -110,8 +117,9 @@ class DateField(Field):
 class BirthDayField(DateField):
     def validate(self, value):
         if super().validate(value=value):
-            now_date = datetime.datetime.today().__format__('%d-%m-%Y')
-            now_date = datetime.datetime.strptime(now_date, '%d-%m-%Y')
+            print("STEP2")
+            now_date = datetime.datetime.today().__format__('%d.%m.%Y')
+            now_date = datetime.datetime.strptime(now_date, '%d.%m.%Y')
             if now_date - value > datetime.timedelta(days=70*365):
                 return False
             else:
@@ -163,13 +171,32 @@ class OnlineScoreRequest:
             return object.__getattribute__(self, item).value
         return object.__getattribute__(self, item)
 
+    def find_score(self):
+        return get_score(store=None, phone=self.phone, email=self.email, birthday=self.birthday,
+                         gender=self.gender, first_name=self.first_name, last_name=self.last_name)
+
 
 class MethodRequest:
+    init_complete = False
     account = CharField(required=False, nullable=True)
     login = CharField(required=True, nullable=True)
     token = CharField(required=True, nullable=True)
     arguments = ArgumentsField(required=True, nullable=True)
     method = CharField(required=True, nullable=False)
+
+    def __init__(self, account, login, token, arguments, method):
+        self.account.set_value(account)
+        self.login.set_value(login)
+        self.token.set_value(token)
+        self.arguments.set_value(arguments)
+        self.method.set_value(method)
+        self.init_complete = True
+
+    def __getattribute__(self, item):
+        item_list = ["account", "login", "token", "arguments", "method"]
+        if item in item_list and self.init_complete:
+            return object.__getattribute__(self, item).value
+        return object.__getattribute__(self, item)
 
     @property
     def is_admin(self):
@@ -180,14 +207,31 @@ def check_auth(request):
     if request.is_admin:
         digest = hashlib.sha512(datetime.datetime.now().strftime("%Y%m%d%H") + ADMIN_SALT).hexdigest()
     else:
-        digest = hashlib.sha512(request.account + request.login + SALT).hexdigest()
+        digest = hashlib.sha512((request.account + request.login + SALT).encode('utf-8')).hexdigest()
     if digest == request.token:
         return True
     return False
 
 
 def method_handler(request, ctx, store):
-    response, code = None, None
+    request_body = request['body']
+    MethodRequest_obj = MethodRequest(account=request_body['account'], login=request_body['login'],
+                                      token=request_body['token'], arguments=request_body['arguments'],
+                                      method=request_body['method'])
+    if check_auth(MethodRequest_obj):
+        if MethodRequest_obj.method == "online_score":
+
+            OnlineScoreRequest_obj = OnlineScoreRequest(first_name=MethodRequest_obj.arguments["first_name"],
+                                                        last_name=MethodRequest_obj.arguments["last_name"],
+                                                        email=MethodRequest_obj.arguments["email"],
+                                                        phone=MethodRequest_obj.arguments["phone"],
+                                                        birthday=datetime.datetime.strptime(MethodRequest_obj.arguments["birthday"], '%d.%m.%Y'),
+                                                        gender=MethodRequest_obj.arguments["gender"],
+                                                        )
+            score = OnlineScoreRequest_obj.find_score()
+            print(f"score {score}")
+
+    response, code = 1, 1
     return response, code
 
 
