@@ -9,7 +9,7 @@ import uuid
 from optparse import OptionParser
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
-from scoring import get_score
+from scoring import get_score, get_interests
 
 SALT = "Otus"
 ADMIN_LOGIN = "admin"
@@ -143,8 +143,23 @@ class ClientIDsField(Field):
 
 
 class ClientsInterestsRequest:
+    init_complete = False
     client_ids = ClientIDsField(required=True)
     date = DateField(required=False, nullable=True)
+
+    def __init__(self, client_ids, date):
+        self.client_ids.set_value(client_ids)
+        self.date.set_value(date)
+        self.init_complete = True
+
+    def __getattribute__(self, item):
+        item_list = ["client_ids", "date"]
+        if item in item_list and self.init_complete:
+            return object.__getattribute__(self, item).value
+        return object.__getattribute__(self, item)
+
+    def find_interests(self):
+        return get_interests(store=None, cid=self.client_ids)
 
 
 class OnlineScoreRequest:
@@ -220,7 +235,6 @@ def method_handler(request, ctx, store):
                                       method=request_body['method'])
     if check_auth(MethodRequest_obj):
         if MethodRequest_obj.method == "online_score":
-
             OnlineScoreRequest_obj = OnlineScoreRequest(first_name=MethodRequest_obj.arguments["first_name"],
                                                         last_name=MethodRequest_obj.arguments["last_name"],
                                                         email=MethodRequest_obj.arguments["email"],
@@ -230,6 +244,16 @@ def method_handler(request, ctx, store):
                                                         )
             score = OnlineScoreRequest_obj.find_score()
             print(f"score {score}")
+            return f"{score}".encode('utf-8'), OK
+        elif MethodRequest_obj.method == "clients_interests":
+            ClientsInterestsRequest_obj = ClientsInterestsRequest(client_ids=MethodRequest_obj.arguments["client_ids"],
+                                                                  date=MethodRequest_obj.arguments["date"])
+            interests = ClientsInterestsRequest_obj.find_interests()
+            print(f"interests {interests}")
+        else:
+            return ERRORS[NOT_FOUND], NOT_FOUND
+    else:
+        return ERRORS[FORBIDDEN], FORBIDDEN
 
     response, code = 1, 1
     return response, code
