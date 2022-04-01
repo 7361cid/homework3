@@ -37,20 +37,23 @@ GENDERS = {
 }
 
 
+class ValidateError(Exception):
+    pass
+
+
 class Field:
-    def __init__(self, required, nullable=False):
+    def __init__(self, required, nullable=False, field_name=""):
         self.required = required
         self.nullable = nullable
         self.value = None
+        self.field_name = ""  # для логирования часто используемых типов полей, в этом случае для CharField
 
     def validate(self, value):
         return value
 
     def set_value(self, value):
-        if self.validate(value):
-            self.value = value
-        else:
-            raise ValueError
+        self.validate(value)
+        self.value = value
 
 
 class CharField(Field):
@@ -60,7 +63,7 @@ class CharField(Field):
         if isinstance(value, str):
             return True
         else:
-            return False
+            raise ValidateError(f"Ошибка в поле {self.field_name}")
 
     def __add__(self, other):
         if isinstance(other, str):
@@ -78,7 +81,7 @@ class ArgumentsField(Field):
                 json.dumps(value)
                 return True
             except json.JSONDecodeError:
-                return False
+                raise ValidateError("Ошибка в поле arguments")
 
 
 class EmailField(Field):
@@ -88,7 +91,7 @@ class EmailField(Field):
         if isinstance(value, str) and '@' in value:
             return True
         else:
-            return False
+            raise ValidateError("Ошибка в поле email")
 
 
 class PhoneField(Field):
@@ -100,7 +103,7 @@ class PhoneField(Field):
         elif isinstance(value, int) and len(str(value)) == 11 and str(value)[0] == "7":
             return True
         else:
-            return False
+            raise ValidateError("Ошибка в поле phone")
 
 
 class DateField(Field):
@@ -111,21 +114,20 @@ class DateField(Field):
             datetime.datetime.strptime(value, '%d.%m.%Y')
             return True
         except ValueError:
-            return False
+            raise ValidateError("Ошибка в поле date")
 
 
 class BirthDayField(DateField):
     def validate(self, value):
-        if super().validate(value=value):
-            now_date = datetime.datetime.today().__format__('%d.%m.%Y')
-            now_date = datetime.datetime.strptime(now_date, '%d.%m.%Y')
-            date_value = datetime.datetime.strptime(value, '%d.%m.%Y')
-            if now_date - date_value > datetime.timedelta(days=70*365):
-                return False
-            else:
-                return True
-        else:
-            return False
+        try:
+            super().validate(value=value)
+        except ValidateError:
+            raise ValidateError("Ошибка в поле birthday")
+        now_date = datetime.datetime.today().__format__('%d.%m.%Y')
+        now_date = datetime.datetime.strptime(now_date, '%d.%m.%Y')
+        date_value = datetime.datetime.strptime(value, '%d.%m.%Y')
+        if now_date - date_value > datetime.timedelta(days=70 * 365):
+            raise ValidateError("Ошибка в поле birthday")
 
 
 class GenderField(Field):
@@ -135,11 +137,22 @@ class GenderField(Field):
         if value in [0, 1, 2]:
             return True
         else:
-            return False
+            raise ValidateError("Ошибка в поле gender")
 
 
 class ClientIDsField(Field):
-    pass
+    def validate(self, value):
+        if self.value is None and self.nullable:
+            return True
+        if type(value) is list:
+            if value is []:
+                return True
+            for num in value:
+                if type(num) is not int:
+                    return False
+            return True
+        else:
+            raise ValidateError("Ошибка в поле client_ids")
 
 
 class ClientsInterestsRequest:
@@ -164,8 +177,8 @@ class ClientsInterestsRequest:
 
 class OnlineScoreRequest:
     init_complete = False
-    first_name = CharField(required=False, nullable=True)
-    last_name = CharField(required=False, nullable=True)
+    first_name = CharField(required=False, nullable=True, field_name="first_name")
+    last_name = CharField(required=False, nullable=True, field_name="last_name")
     email = EmailField(required=False, nullable=True)
     phone = PhoneField(required=False, nullable=True)
     birthday = BirthDayField(required=False, nullable=True)
@@ -193,11 +206,11 @@ class OnlineScoreRequest:
 
 class MethodRequest:
     init_complete = False
-    account = CharField(required=False, nullable=True)
-    login = CharField(required=True, nullable=True)
-    token = CharField(required=True, nullable=True)
+    account = CharField(required=False, nullable=True, field_name="account")
+    login = CharField(required=True, nullable=True, field_name="login")
+    token = CharField(required=True, nullable=True, field_name="token")
     arguments = ArgumentsField(required=True, nullable=True)
-    method = CharField(required=True, nullable=False)
+    method = CharField(required=True, nullable=False, field_name="method")
 
     def __init__(self, account, login, token, arguments, method):
         self.account.set_value(account)
@@ -213,6 +226,13 @@ class MethodRequest:
             return object.__getattribute__(self, item).value
         return object.__getattribute__(self, item)
 
+    @staticmethod
+    def validate(request_body):
+        fields = ["account", "login", "token", "arguments", "method"]
+        for field in fields:
+            if field not in request_body:
+                raise ValidateError(f"Не хватает поля {field}")
+
     @property
     def is_admin(self):
         return self.login == ADMIN_LOGIN
@@ -220,7 +240,7 @@ class MethodRequest:
 
 def check_auth(request):
     if request.is_admin:
-        digest = hashlib.sha512(datetime.datetime.now().strftime("%Y%m%d%H") + ADMIN_SALT).hexdigest()
+        digest = hashlib.sha512((datetime.datetime.now().strftime("%Y%m%d%H") + ADMIN_SALT).encode('utf-8')).hexdigest()
     else:
         digest = hashlib.sha512((request.account + request.login + SALT).encode('utf-8')).hexdigest()
     if digest == request.token:
@@ -229,35 +249,37 @@ def check_auth(request):
 
 
 def method_handler(request, ctx, store):
-    request_body = request['body']
-    MethodRequest_obj = MethodRequest(account=request_body['account'], login=request_body['login'],
-                                      token=request_body['token'], arguments=request_body['arguments'],
-                                      method=request_body['method'])
-    if check_auth(MethodRequest_obj):
-        if MethodRequest_obj.method == "online_score":
-            OnlineScoreRequest_obj = OnlineScoreRequest(first_name=MethodRequest_obj.arguments["first_name"],
-                                                        last_name=MethodRequest_obj.arguments["last_name"],
-                                                        email=MethodRequest_obj.arguments["email"],
-                                                        phone=MethodRequest_obj.arguments["phone"],
-                                                        birthday=MethodRequest_obj.arguments["birthday"],
-                                                        gender=MethodRequest_obj.arguments["gender"],
-                                                        )
-            score = OnlineScoreRequest_obj.find_score()
-            print(f"score {score}")
-            return f"{score}".encode('utf-8'), OK
-        elif MethodRequest_obj.method == "clients_interests":
-            ClientsInterestsRequest_obj = ClientsInterestsRequest(client_ids=MethodRequest_obj.arguments["client_ids"],
-                                                                  date=MethodRequest_obj.arguments["date"])
-            interests = ClientsInterestsRequest_obj.find_interests()
-            print(f"interests {interests}")
-            return f"{interests}".encode('utf-8'), OK
+    try:
+        request_body = request['body']
+        MethodRequest.validate(request_body)
+        MethodRequest_obj = MethodRequest(account=request_body['account'], login=request_body['login'],
+                                          token=request_body['token'], arguments=request_body['arguments'],
+                                          method=request_body['method'])
+        if check_auth(MethodRequest_obj):
+            if MethodRequest_obj.method == "online_score":
+                OnlineScoreRequest_obj = OnlineScoreRequest(first_name=MethodRequest_obj.arguments["first_name"],
+                                                            last_name=MethodRequest_obj.arguments["last_name"],
+                                                            email=MethodRequest_obj.arguments["email"],
+                                                            phone=MethodRequest_obj.arguments["phone"],
+                                                            birthday=MethodRequest_obj.arguments["birthday"],
+                                                            gender=MethodRequest_obj.arguments["gender"],
+                                                            )
+                score = OnlineScoreRequest_obj.find_score()
+                print(f"score {score}")
+                return f"{score}".encode('utf-8'), OK
+            elif MethodRequest_obj.method == "clients_interests":
+                ClientsInterestsRequest_obj = ClientsInterestsRequest(
+                    client_ids=MethodRequest_obj.arguments["client_ids"],
+                    date=MethodRequest_obj.arguments["date"])
+                interests = ClientsInterestsRequest_obj.find_interests()
+                print(f"interests {interests}")
+                return f"{interests}".encode('utf-8'), OK
+            else:
+                return ERRORS[NOT_FOUND], NOT_FOUND
         else:
-            return ERRORS[NOT_FOUND], NOT_FOUND
-    else:
-        return ERRORS[FORBIDDEN], FORBIDDEN
-
-    response, code = 1, 1
-    return response, code
+            return ERRORS[FORBIDDEN], FORBIDDEN
+    except (ValidateError, KeyError) as exc:
+        return ERRORS[INVALID_REQUEST] + " " + str(exc), INVALID_REQUEST
 
 
 class MainHTTPHandler(BaseHTTPRequestHandler):
@@ -294,7 +316,7 @@ class MainHTTPHandler(BaseHTTPRequestHandler):
         self.send_response(code)
         self.send_header("Content-Type", "application/json")
         self.end_headers()
-        if type(response) == bytes:     # Иначе ошибка json.dumps
+        if type(response) == bytes:  # Иначе ошибка json.dumps
             response = response.decode(encoding="utf-8")
         if code not in ERRORS:
             r = {"response": response, "code": code}
