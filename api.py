@@ -108,7 +108,7 @@ class DateField(Field):
         if value is None and self.nullable:
             return True
         try:
-            datetime.datetime.strftime(value, '%d.%m.%Y')
+            datetime.datetime.strptime(value, '%d.%m.%Y')
             return True
         except ValueError:
             return False
@@ -117,10 +117,10 @@ class DateField(Field):
 class BirthDayField(DateField):
     def validate(self, value):
         if super().validate(value=value):
-            print("STEP2")
             now_date = datetime.datetime.today().__format__('%d.%m.%Y')
             now_date = datetime.datetime.strptime(now_date, '%d.%m.%Y')
-            if now_date - value > datetime.timedelta(days=70*365):
+            date_value = datetime.datetime.strptime(value, '%d.%m.%Y')
+            if now_date - date_value > datetime.timedelta(days=70*365):
                 return False
             else:
                 return True
@@ -239,7 +239,7 @@ def method_handler(request, ctx, store):
                                                         last_name=MethodRequest_obj.arguments["last_name"],
                                                         email=MethodRequest_obj.arguments["email"],
                                                         phone=MethodRequest_obj.arguments["phone"],
-                                                        birthday=datetime.datetime.strptime(MethodRequest_obj.arguments["birthday"], '%d.%m.%Y'),
+                                                        birthday=MethodRequest_obj.arguments["birthday"],
                                                         gender=MethodRequest_obj.arguments["gender"],
                                                         )
             score = OnlineScoreRequest_obj.find_score()
@@ -250,6 +250,7 @@ def method_handler(request, ctx, store):
                                                                   date=MethodRequest_obj.arguments["date"])
             interests = ClientsInterestsRequest_obj.find_interests()
             print(f"interests {interests}")
+            return f"{interests}".encode('utf-8'), OK
         else:
             return ERRORS[NOT_FOUND], NOT_FOUND
     else:
