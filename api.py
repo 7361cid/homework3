@@ -63,7 +63,7 @@ class CharField(Field):
         if isinstance(value, str):
             return True
         else:
-            raise ValidateError(f"Ошибка в поле {self.field_name}")
+            raise ValidateError(f"error: {self.field_name} must be string")
 
     def __add__(self, other):
         if isinstance(other, str):
@@ -81,29 +81,48 @@ class ArgumentsField(Field):
                 json.dumps(value)
                 return True
             except json.JSONDecodeError:
-                raise ValidateError("Ошибка в поле arguments")
+                raise ValidateError("error: arguments JSONDecodeError")
+        else:
+            raise ValidateError(f"error: arguments bad type {type(value)}")
 
 
 class EmailField(Field):
     def validate(self, value):
         if value is None and self.nullable:
             return True
-        if isinstance(value, str) and '@' in value:
-            return True
+        if isinstance(value, str):
+            if '@' in value:
+                return True
+            else:
+                raise ValidateError("error: email without @")
         else:
-            raise ValidateError("Ошибка в поле email")
+            raise ValidateError(f"error: email bad type {type(value)}")
 
 
 class PhoneField(Field):
     def validate(self, value):
         if value is None and self.nullable:
             return True
-        if isinstance(value, str) and len(value) == 11 and value[0] == "7" and value.isdigit():
-            return True
-        elif isinstance(value, int) and len(str(value)) == 11 and str(value)[0] == "7":
-            return True
+        print(f"value {value} {type(value)} {value.isdigit()}")
+        if isinstance(value, str):
+            if len(value) != 11:
+                raise ValidateError("error: phone length not equal 11")
+            elif value[0] != "7":
+                raise ValidateError("error: phone must start with 7")
+            elif not value.isdigit():
+                raise ValidateError("error: phone must be number or string of numbers")
+            else:
+                return True
+        elif isinstance(value, int):
+            if str(value)[0] != "7":
+                raise ValidateError("error: phone must start with 7")
+            elif len(str(value)) != 11:
+                raise ValidateError("error: phone length not equal 11")
+            else:
+                return True
         else:
-            raise ValidateError("Ошибка в поле phone")
+            raise ValidateError("error: phone bad data type")
+
 
 
 class DateField(Field):
@@ -114,7 +133,7 @@ class DateField(Field):
             datetime.datetime.strptime(value, '%d.%m.%Y')
             return True
         except ValueError:
-            raise ValidateError("Ошибка в поле date")
+            raise ValidateError("error: date not in format dd.mm.yyyy")
 
 
 class BirthDayField(DateField):
@@ -122,12 +141,14 @@ class BirthDayField(DateField):
         try:
             super().validate(value=value)
         except ValidateError:
-            raise ValidateError("Ошибка в поле birthday")
+            raise ValidateError("error: birthday not in format dd.mm.yyyy")
+        if value is None and self.nullable:
+            return True
         now_date = datetime.datetime.today().__format__('%d.%m.%Y')
         now_date = datetime.datetime.strptime(now_date, '%d.%m.%Y')
         date_value = datetime.datetime.strptime(value, '%d.%m.%Y')
         if now_date - date_value > datetime.timedelta(days=70 * 365):
-            raise ValidateError("Ошибка в поле birthday")
+            raise ValidateError("error:  bad birthday You're over 70")
 
 
 class GenderField(Field):
@@ -137,22 +158,22 @@ class GenderField(Field):
         if value in [0, 1, 2]:
             return True
         else:
-            raise ValidateError("Ошибка в поле gender")
+            raise ValidateError("error: gender must be 0 or 1 or 2")
 
 
 class ClientIDsField(Field):
     def validate(self, value):
         if self.value is None and self.nullable:
-            return True
+            raise ValidateError("error: client_ids is empty")
         if type(value) is list:
-            if value is []:
-                return True
+            if len(value) == 0:
+                raise ValidateError("error: client_ids is empty list")
             for num in value:
                 if type(num) is not int:
-                    return False
+                    raise ValidateError("error: not number in client_ids")
             return True
         else:
-            raise ValidateError("Ошибка в поле client_ids")
+            raise ValidateError("error: client_ids not list")
 
 
 class ClientsInterestsRequest:
@@ -160,7 +181,7 @@ class ClientsInterestsRequest:
     client_ids = ClientIDsField(required=True)
     date = DateField(required=False, nullable=True)
 
-    def __init__(self, client_ids, date):
+    def __init__(self, client_ids, date=None):
         self.client_ids.set_value(client_ids)
         self.date.set_value(date)
         self.init_complete = True
@@ -184,7 +205,7 @@ class OnlineScoreRequest:
     birthday = BirthDayField(required=False, nullable=True)
     gender = GenderField(required=False, nullable=True)
 
-    def __init__(self, first_name, last_name, email, phone, birthday, gender):
+    def __init__(self, first_name=None, last_name=None, email=None, phone=None, birthday=None, gender=None):
         self.first_name.set_value(first_name)
         self.last_name.set_value(last_name)
         self.email.set_value(email)
@@ -257,23 +278,19 @@ def method_handler(request, ctx, store):
                                           method=request_body['method'])
         if check_auth(MethodRequest_obj):
             if MethodRequest_obj.method == "online_score":
-                OnlineScoreRequest_obj = OnlineScoreRequest(first_name=MethodRequest_obj.arguments["first_name"],
-                                                            last_name=MethodRequest_obj.arguments["last_name"],
-                                                            email=MethodRequest_obj.arguments["email"],
-                                                            phone=MethodRequest_obj.arguments["phone"],
-                                                            birthday=MethodRequest_obj.arguments["birthday"],
-                                                            gender=MethodRequest_obj.arguments["gender"],
-                                                            )
+                if MethodRequest_obj.is_admin:
+                    return {"score": 42}, OK
+                OnlineScoreRequest_obj = OnlineScoreRequest(**MethodRequest_obj.arguments)
                 score = OnlineScoreRequest_obj.find_score()
                 print(f"score {score}")
-                return f"{score}".encode('utf-8'), OK
+                return {"score": score}, OK
             elif MethodRequest_obj.method == "clients_interests":
                 ClientsInterestsRequest_obj = ClientsInterestsRequest(
                     client_ids=MethodRequest_obj.arguments["client_ids"],
                     date=MethodRequest_obj.arguments["date"])
                 interests = ClientsInterestsRequest_obj.find_interests()
                 print(f"interests {interests}")
-                return f"{interests}".encode('utf-8'), OK
+                return {"interests": interests}, OK
             else:
                 return ERRORS[NOT_FOUND], NOT_FOUND
         else:
