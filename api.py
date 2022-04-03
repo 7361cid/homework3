@@ -103,7 +103,6 @@ class PhoneField(Field):
     def validate(self, value):
         if value is None and self.nullable:
             return True
-        print(f"value {value} {type(value)} {value.isdigit()}")
         if isinstance(value, str):
             if len(value) != 11:
                 raise ValidateError("error: phone length not equal 11")
@@ -153,7 +152,7 @@ class BirthDayField(DateField):
 
 class GenderField(Field):
     def validate(self, value):
-        if self.value is None and self.nullable:
+        if value is None and self.nullable:
             return True
         if value in [0, 1, 2]:
             return True
@@ -163,8 +162,11 @@ class GenderField(Field):
 
 class ClientIDsField(Field):
     def validate(self, value):
-        if self.value is None and self.nullable:
-            raise ValidateError("error: client_ids is empty")
+        if value is None:
+            if self.nullable:
+                return True
+            else:
+                raise ValidateError("error: client_ids is empty")
         if type(value) is list:
             if len(value) == 0:
                 raise ValidateError("error: client_ids is empty list")
@@ -181,7 +183,7 @@ class ClientsInterestsRequest:
     client_ids = ClientIDsField(required=True)
     date = DateField(required=False, nullable=True)
 
-    def __init__(self, client_ids, date=None):
+    def __init__(self, client_ids=None, date=None):
         self.client_ids.set_value(client_ids)
         self.date.set_value(date)
         self.init_complete = True
@@ -193,7 +195,10 @@ class ClientsInterestsRequest:
         return object.__getattribute__(self, item)
 
     def find_interests(self):
-        return get_interests(store=None, cid=self.client_ids)
+        intersts = {}
+        for id in self.client_ids:
+            intersts[str(id)] = get_interests(store=None, cid=id)
+        return intersts
 
 
 class OnlineScoreRequest:
@@ -282,14 +287,10 @@ def method_handler(request, ctx, store):
                     return {"score": 42}, OK
                 OnlineScoreRequest_obj = OnlineScoreRequest(**MethodRequest_obj.arguments)
                 score = OnlineScoreRequest_obj.find_score()
-                print(f"score {score}")
                 return {"score": score}, OK
             elif MethodRequest_obj.method == "clients_interests":
-                ClientsInterestsRequest_obj = ClientsInterestsRequest(
-                    client_ids=MethodRequest_obj.arguments["client_ids"],
-                    date=MethodRequest_obj.arguments["date"])
+                ClientsInterestsRequest_obj = ClientsInterestsRequest(**MethodRequest_obj.arguments)
                 interests = ClientsInterestsRequest_obj.find_interests()
-                print(f"interests {interests}")
                 return {"interests": interests}, OK
             else:
                 return ERRORS[NOT_FOUND], NOT_FOUND
