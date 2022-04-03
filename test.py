@@ -98,7 +98,7 @@ class TestSuite(unittest.TestCase):
         self.assertEqual(api.OK, code, arguments)
         score = response.get("score")
         self.assertTrue(isinstance(score, (int, float)) and score >= 0, arguments)
-     #   self.assertEqual(sorted(self.context["has"]), sorted(arguments.keys()))
+        self.assertEqual(sorted(self.context["has"]), sorted(arguments.keys()))
 
     def test_ok_score_admin_request(self):
         arguments = {"phone": "79175002040", "email": "stupnikov@otus.ru"}
@@ -137,7 +137,7 @@ class TestSuite(unittest.TestCase):
         self.assertEqual(len(arguments["client_ids"]), len(response.get("interests")))
         self.assertTrue(all(v and isinstance(v, list) and all(isinstance(i, str) for i in v)
                         for v in response.get('interests').values()))
-      #  self.assertEqual(self.context.get("nclients"), len(arguments["client_ids"]))  context задается перед запросом, для чего проверка?
+        self.assertEqual(self.context.get("nclients"), len(arguments["client_ids"]))
 
 
 if __name__ == "__main__":

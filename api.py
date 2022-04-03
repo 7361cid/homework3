@@ -281,6 +281,7 @@ def method_handler(request, ctx, store):
         MethodRequest_obj = MethodRequest(account=request_body['account'], login=request_body['login'],
                                           token=request_body['token'], arguments=request_body['arguments'],
                                           method=request_body['method'])
+        ctx["has"] = sorted(MethodRequest_obj.arguments.keys())
         if check_auth(MethodRequest_obj):
             if MethodRequest_obj.method == "online_score":
                 if MethodRequest_obj.is_admin:
@@ -289,6 +290,7 @@ def method_handler(request, ctx, store):
                 score = OnlineScoreRequest_obj.find_score()
                 return {"score": score}, OK
             elif MethodRequest_obj.method == "clients_interests":
+                ctx["nclients"] = len(MethodRequest_obj.arguments["client_ids"])
                 ClientsInterestsRequest_obj = ClientsInterestsRequest(**MethodRequest_obj.arguments)
                 interests = ClientsInterestsRequest_obj.find_interests()
                 return {"interests": interests}, OK
