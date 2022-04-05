@@ -6,6 +6,7 @@ import datetime
 import logging
 import hashlib
 import uuid
+import redis
 from optparse import OptionParser
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
@@ -302,6 +303,17 @@ def method_handler(request, ctx, store):
         return ERRORS[INVALID_REQUEST] + " " + str(exc), INVALID_REQUEST
 
 
+class Store:
+    def __init__(self):
+        self.redis = redis.StrictRedis(host='localhost', port=6379, db=0)
+
+    def set(self, key, value):
+        return self.redis.set(key, value)
+
+    def get(self, key):
+        return self.redis.get(key)
+
+
 class MainHTTPHandler(BaseHTTPRequestHandler):
     router = {
         "method": method_handler
@@ -349,6 +361,9 @@ class MainHTTPHandler(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
+    mystore = Store()
+    mystore.set("key", "data")
+    print(f"mystore {mystore.get('key')}")
     op = OptionParser()
     op.add_option("-p", "--port", action="store", type=int, default=8080)
     op.add_option("-l", "--log", action="store", default=None)
