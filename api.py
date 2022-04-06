@@ -196,10 +196,10 @@ class ClientsInterestsRequest:
             return object.__getattribute__(self, item).value
         return object.__getattribute__(self, item)
 
-    def find_interests(self):
+    def find_interests(self, store):
         intersts = {}
         for id in self.client_ids:
-            intersts[str(id)] = get_interests(store=None, cid=id)
+            intersts[str(id)] = get_interests(store=store, cid=id)
         return intersts
 
 
@@ -227,8 +227,8 @@ class OnlineScoreRequest:
             return object.__getattribute__(self, item).value
         return object.__getattribute__(self, item)
 
-    def find_score(self):
-        return get_score(store=None, phone=self.phone, email=self.email, birthday=self.birthday,
+    def find_score(self, store):
+        return get_score(store=store, phone=self.phone, email=self.email, birthday=self.birthday,
                          gender=self.gender, first_name=self.first_name, last_name=self.last_name)
 
 
@@ -289,12 +289,12 @@ def method_handler(request, ctx, store):
                 if MethodRequest_obj.is_admin:
                     return {"score": 42}, OK
                 OnlineScoreRequest_obj = OnlineScoreRequest(**MethodRequest_obj.arguments)
-                score = OnlineScoreRequest_obj.find_score()
+                score = OnlineScoreRequest_obj.find_score(store)
                 return {"score": score}, OK
             elif MethodRequest_obj.method == "clients_interests":
                 ctx["nclients"] = len(MethodRequest_obj.arguments["client_ids"])
                 ClientsInterestsRequest_obj = ClientsInterestsRequest(**MethodRequest_obj.arguments)
-                interests = ClientsInterestsRequest_obj.find_interests()
+                interests = ClientsInterestsRequest_obj.find_interests(store)
                 return {"interests": interests}, OK
             else:
                 return ERRORS[NOT_FOUND], NOT_FOUND
@@ -339,12 +339,15 @@ class Store:
         except Exception:
             return 0
 
+    def cache_set(self, key, value, time):
+        self.set(key, value)
+
 
 class MainHTTPHandler(BaseHTTPRequestHandler):
     router = {
         "method": method_handler
     }
-    store = None
+    store = Store()
 
     def get_request_id(self, headers):
         return headers.get('HTTP_X_REQUEST_ID', uuid.uuid4().hex)
@@ -387,9 +390,6 @@ class MainHTTPHandler(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
-    mystore = Store()
-    mystore.set("key", "data")
-    print(f"mystore {mystore.get('key')}")
     op = OptionParser()
     op.add_option("-p", "--port", action="store", type=int, default=8080)
     op.add_option("-l", "--log", action="store", default=None)
