@@ -5,6 +5,7 @@ import json
 import datetime
 import logging
 import hashlib
+import time
 import uuid
 import redis
 from optparse import OptionParser
@@ -303,15 +304,40 @@ def method_handler(request, ctx, store):
         return ERRORS[INVALID_REQUEST] + " " + str(exc), INVALID_REQUEST
 
 
+class RetrieException(Exception):
+    pass
+
+
 class Store:
-    def __init__(self):
+    """
+    Use Redis-x64-3.0.504
+    """
+    def __init__(self, retries=3, timeout=5):
         self.redis = redis.StrictRedis(host='localhost', port=6379, db=0)
+        self.retries = retries
+        self.timeout = timeout
 
     def set(self, key, value):
         return self.redis.set(key, value)
 
     def get(self, key):
-        return self.redis.get(key)
+        retries = self.retries
+        while retries:
+            try:
+                return self.redis.get(key)
+            except redis.exceptions.ConnectionError:
+                time.sleep(self.timeout)
+                retries -= 1
+        raise RetrieException
+
+    def cache_get(self, key):
+        """
+        Отрабатывает в любом случае
+        """
+        try:
+            self.get(key)
+        except Exception:
+            return 0
 
 
 class MainHTTPHandler(BaseHTTPRequestHandler):
