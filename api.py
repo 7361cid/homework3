@@ -324,16 +324,12 @@ class Store:
         retries = self.retries
         while retries:
             try:
+                print(f"self.redis.get(key) {self.redis.get(key)}")
                 return self.redis.get(key)
             except redis.exceptions.ConnectionError:
                 time.sleep(self.timeout)
                 retries -= 1
         raise RetrieException
-
-    def data_init(self):
-        self.set(key="i:1", value=json.dumps(["reading"]))
-        self.set(key="i:2", value=json.dumps(["codding"]))
-        self.set(key="i:3", value=json.dumps(["running"]))
 
     def cache_get(self, key):
         """
@@ -353,7 +349,7 @@ class MainHTTPHandler(BaseHTTPRequestHandler):
         "method": method_handler
     }
     store = Store()
-    store.data_init()
+
 
     def get_request_id(self, headers):
         return headers.get('HTTP_X_REQUEST_ID', uuid.uuid4().hex)

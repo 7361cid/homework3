@@ -29,7 +29,7 @@ def get_score(store, phone, email, birthday=None, gender=None, first_name=None, 
 
 
 def get_interests(store, cid):
-    print(f"what? {('i:%s' % cid)}")
-    r = store.get("i:%s" % cid)   # Чтобы но работало нужна предварительная инициализация (метод data_init)
-    print(f"what? {r}")
-    return json.loads(r) if r else []
+    r = store.get("i:%s" % cid)
+    print(f"\n\n key {('i:%s' % cid)} value {r} type {type(r)} \n\n")
+    print(f"CHECK {r}  {r.decode('utf-8')}")
+    return [r.decode('utf-8')] if r else []

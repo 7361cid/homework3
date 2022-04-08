@@ -3,6 +3,7 @@ import datetime
 import functools
 import unittest
 import logging
+import json
 from optparse import OptionParser
 
 import api
@@ -29,7 +30,9 @@ class TestSuite(unittest.TestCase):
         self.context = {}
         self.headers = {}
         self.store = api.Store()
-        self.store.data_init()
+        self.store.set(key="i:1", value="reading")
+        self.store.set(key="i:2", value="codding")
+        self.store.set(key="i:3", value="running")
 
     def get_response(self, request):
         return api.method_handler({"body": request, "headers": self.headers}, self.context, self.store)
