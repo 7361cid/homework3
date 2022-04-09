@@ -4,6 +4,7 @@ import functools
 import unittest
 import logging
 from optparse import OptionParser
+from mock import Mock
 
 import api
 
@@ -182,6 +183,30 @@ class TestSuite(unittest.TestCase):
         response, code = self.get_response(request)
         self.assertEqual(api.INVALID_REQUEST, code)
         self.assertEqual(response, arguments[1])
+
+    @staticmethod
+    def mock_method():
+        raise api.RetrieException
+
+    @cases([{}])
+    def test_no_store_score_request(self, arguments):
+        self.store.get = Mock(side_effect=api.RetrieException)
+        request = {"account": "horns&hoofs", "login": "h&f", "method": "online_score",
+                       "arguments": arguments}
+        self.set_valid_auth(request)
+        response, code = self.get_response(request)
+        self.assertEqual(api.OK, code)
+
+    @cases([{"client_ids": [0]}])
+    def test_no_store_clients_interests(self, arguments):
+        self.store.get = Mock(side_effect=api.RetrieException)
+        with self.assertRaises(api.RetrieException):
+            request = {"account": "horns&hoofs", "login": "h&f", "method": "clients_interests",
+                       "arguments": arguments}
+            self.set_valid_auth(request)
+            response, code = self.get_response(request)
+            print(f"response {response}")
+            self.assertEqual(api.OK, code)
 
 
 if __name__ == "__main__":
