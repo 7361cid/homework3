@@ -1,5 +1,4 @@
 import hashlib
-import json
 
 
 def get_score(store, phone, email, birthday=None, gender=None, first_name=None, last_name=None):
@@ -24,12 +23,10 @@ def get_score(store, phone, email, birthday=None, gender=None, first_name=None, 
     if first_name and last_name:
         score += 0.5
     # cache for 60 minutes
-    store.cache_set(key, score, 60 * 60)
+    store.cache_set(key, score, 60 * 60)   # Не ясно для чего передается время
     return score
 
 
 def get_interests(store, cid):
     r = store.get("i:%s" % cid)
-    print(f"\n\n key {('i:%s' % cid)} value {r} type {type(r)} \n\n")
-    print(f"CHECK {r}  {r.decode('utf-8')}")
     return [r.decode('utf-8')] if r else []

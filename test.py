@@ -3,7 +3,6 @@ import datetime
 import functools
 import unittest
 import logging
-import json
 from optparse import OptionParser
 
 import api
@@ -21,7 +20,9 @@ def cases(cases):
                 except Exception as e:
                     logging.exception(f"Fail test {f.__name__} case {c} with {e}")
                     raise Exception
+
         return wrapper
+
     return decorator
 
 
@@ -30,6 +31,8 @@ class TestSuite(unittest.TestCase):
         self.context = {}
         self.headers = {}
         self.store = api.Store()
+        # заполнение данными для теста метода get_interests
+        self.store.set(key="i:0", value="writing")
         self.store.set(key="i:1", value="reading")
         self.store.set(key="i:2", value="codding")
         self.store.set(key="i:3", value="running")
@@ -70,8 +73,8 @@ class TestSuite(unittest.TestCase):
         self.assertTrue(len(response))
 
     @cases([
-       # {}  Может же быть пустым по заданию(все аргументы метода необязательны), мб его не сюда?
-       # {"phone": "79175002040"},   Валидное значение в тесте не валидных?
+        # {}  Может же быть пустым по заданию(все аргументы метода необязательны), мб его не сюда?
+        # {"phone": "79175002040"},   Валидное значение в тесте не валидных?
         {"phone": "89175002040", "email": "stupnikov@otus.ru"},
         {"phone": "79175002040", "email": "stupnikovotus.ru"},
         {"phone": "79175002040", "email": "stupnikov@otus.ru", "gender": -1},
@@ -81,7 +84,7 @@ class TestSuite(unittest.TestCase):
         {"phone": "79175002040", "email": "stupnikov@otus.ru", "gender": 1, "birthday": "01.01.2000", "first_name": 1},
         {"phone": "79175002040", "email": "stupnikov@otus.ru", "gender": 1, "birthday": "01.01.2000",
          "first_name": "s", "last_name": 2},
-     #   {"phone": "79175002040", "birthday": "01.01.2000", "first_name": "s"}, Валидное значение в тесте не валидных?
+        #   {"phone": "79175002040", "birthday": "01.01.2000", "first_name": "s"}, Валидное значение в тесте не валидных?
         {"email": "stupnikov@otus.ru", "gender": 1, "last_name": 2},
     ])
     def test_invalid_score_request(self, arguments):
@@ -146,10 +149,39 @@ class TestSuite(unittest.TestCase):
         response, code = self.get_response(request)
         self.assertEqual(api.OK, code, arguments)
         self.assertEqual(len(arguments["client_ids"]), len(response.get("interests")))
-        print(f"Log {response.get('interests').values()}")
         self.assertTrue(all(v and isinstance(v, list) and all(isinstance(i, str) for i in v)
-                        for v in response.get('interests').values()))
+                            for v in response.get('interests').values()))
         self.assertEqual(self.context.get("nclients"), len(arguments["client_ids"]))
+
+    @cases([
+        [{"phone": "89175002040"}, "Invalid Request error: phone must start with 7"],
+        [{"phone": 89175002040}, "Invalid Request error: phone must start with 7"],
+        [{"email": "stupnikovotus.ru"}, "Invalid Request error: email without @"],
+        [{"email": 0}, "Invalid Request error: email bad type <class 'int'>"],
+        [{"gender": -1}, "Invalid Request error: gender must be 0 or 1 or 2"],
+        [{"first_name": 1}, "Invalid Request error: first_name must be string"],
+        [{"last_name": 1}, "Invalid Request error: last_name must be string"],
+        [{"birthday": "XXX"}, "Invalid Request error: birthday not in format dd.mm.yyyy"],
+        [{"birthday": "01.10.1888"}, "Invalid Request error:  bad birthday You're over 70"],
+    ])
+    def test_errors_msg_score_request(self, arguments):
+        request = {"account": "horns&hoofs", "login": "h&f", "method": "online_score", "arguments": arguments[0]}
+        self.set_valid_auth(request)
+        response, code = self.get_response(request)
+        self.assertEqual(api.INVALID_REQUEST, code)
+        self.assertEqual(response, arguments[1])
+
+    @cases([
+        [{"client_ids": [0], "date": "1907.2017"}, "Invalid Request error: date not in format dd.mm.yyyy"],
+        [{"client_ids": []}, "Invalid Request error: client_ids is empty list"],
+        [{"client_ids": "not list"}, "Invalid Request error: client_ids not list"],
+    ])
+    def test_errors_msg_interests_request(self, arguments):
+        request = {"account": "horns&hoofs", "login": "h&f", "method": "clients_interests", "arguments": arguments[0]}
+        self.set_valid_auth(request)
+        response, code = self.get_response(request)
+        self.assertEqual(api.INVALID_REQUEST, code)
+        self.assertEqual(response, arguments[1])
 
 
 if __name__ == "__main__":
