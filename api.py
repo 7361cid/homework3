@@ -51,7 +51,7 @@ class Field:
     def validate(self, value):
         return value
 
-    def set_value(self, value):
+    def __set__(self, instance, value):
         self.validate(value)
         self.value = value
 
@@ -169,8 +169,8 @@ class ClientsInterestsRequest:
     date = DateField(required=False, nullable=True)
 
     def __init__(self, client_ids=None, date=None):
-        self.client_ids.set_value(client_ids)
-        self.date.set_value(date)
+        self.client_ids = client_ids
+        self.date = date
         self.init_complete = True
 
     def __getattribute__(self, item):
@@ -196,12 +196,12 @@ class OnlineScoreRequest:
     gender = GenderField(required=False, nullable=True)
 
     def __init__(self, first_name=None, last_name=None, email=None, phone=None, birthday=None, gender=None):
-        self.first_name.set_value(first_name)
-        self.last_name.set_value(last_name)
-        self.email.set_value(email)
-        self.phone.set_value(phone)
-        self.birthday.set_value(birthday)
-        self.gender.set_value(gender)
+        self.first_name = first_name
+        self.last_name = last_name
+        self.email = email
+        self.phone = phone
+        self.birthday = birthday
+        self.gender = gender
         self.init_complete = True
 
     def __getattribute__(self, item):
@@ -224,11 +224,11 @@ class MethodRequest:
     method = CharField(required=True, nullable=False, field_name="method")
 
     def __init__(self, account, login, token, arguments, method):
-        self.account.set_value(account)
-        self.login.set_value(login)
-        self.token.set_value(token)
-        self.arguments.set_value(arguments)
-        self.method.set_value(method)
+        self.account = account
+        self.login = login
+        self.token = token
+        self.arguments = arguments
+        self.method = method
         self.init_complete = True
 
     def __getattribute__(self, item):
