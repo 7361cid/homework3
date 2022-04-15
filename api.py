@@ -60,6 +60,9 @@ class Field:
         self.validate(value)
         self.value = value
 
+    def __get__(self, instance, owner):
+        return self.value
+
 
 class CharField(Field):
     def validate(self, value):
@@ -175,12 +178,6 @@ class ClientsInterestsRequest:
         self.date = date
         self.init_complete = True
 
-    def __getattribute__(self, item):
-        item_list = ["client_ids", "date"]
-        if item in item_list and self.init_complete:
-            return object.__getattribute__(self, item).value
-        return object.__getattribute__(self, item)
-
     def find_interests(self):
         intersts = {}
         for id in self.client_ids:
@@ -206,12 +203,6 @@ class OnlineScoreRequest:
         self.gender = gender
         self.init_complete = True
 
-    def __getattribute__(self, item):
-        item_list = ["first_name", "last_name", "email", "phone", "birthday", "gender"]
-        if item in item_list and self.init_complete:
-            return object.__getattribute__(self, item).value
-        return object.__getattribute__(self, item)
-
     def find_score(self):
         return get_score(store=None, phone=self.phone, email=self.email, birthday=self.birthday,
                          gender=self.gender, first_name=self.first_name, last_name=self.last_name)
@@ -233,11 +224,6 @@ class MethodRequest:
         self.method = method
         self.init_complete = True
 
-    def __getattribute__(self, item):
-        item_list = ["account", "login", "token", "arguments", "method"]
-        if item in item_list and self.init_complete:
-            return object.__getattribute__(self, item).value
-        return object.__getattribute__(self, item)
 
     @staticmethod
     def validate(request_body):
@@ -274,12 +260,17 @@ def method_handler(request, ctx, store):
                 if MethodRequest_obj.is_admin:
                     return {"score": 42}, OK
                 OnlineScoreRequest_obj = OnlineScoreRequest(**MethodRequest_obj.arguments)
-                score = OnlineScoreRequest_obj.find_score()
+                score = get_score(store=store, phone=OnlineScoreRequest.phone, email=OnlineScoreRequest.email,
+                                  birthday=OnlineScoreRequest_obj.birthday, gender=OnlineScoreRequest.gender,
+                                  first_name=OnlineScoreRequest_obj.first_name,
+                                  last_name=OnlineScoreRequest_obj.last_name)
                 return {"score": score}, OK
             elif MethodRequest_obj.method == "clients_interests":
                 ctx["nclients"] = len(MethodRequest_obj.arguments["client_ids"])
                 ClientsInterestsRequest_obj = ClientsInterestsRequest(**MethodRequest_obj.arguments)
-                interests = ClientsInterestsRequest_obj.find_interests()
+                interests = {}
+                for id in ClientsInterestsRequest_obj.client_ids:
+                    interests[str(id)] = get_interests(store=None, cid=id)
                 return {"interests": interests}, OK
             else:
                 return ERRORS[NOT_FOUND], NOT_FOUND
