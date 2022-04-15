@@ -37,7 +37,7 @@ GENDERS = {
 }
 
 
-class ValidateError(Exception):
+class ValidationError(Exception):
     pass
 
 
@@ -59,11 +59,9 @@ class Field:
 class CharField(Field):
     def validate(self, value):
         if value is None and self.nullable:
-            return True
-        if isinstance(value, str):
-            return True
-        else:
-            raise ValidateError(f"error: {self.field_name} must be string")
+            return
+        if not isinstance(value, str):
+            raise ValidationError(f"error: {self.field_name} must be string")
 
     def __add__(self, other):
         if isinstance(other, str):
@@ -75,107 +73,94 @@ class CharField(Field):
 class ArgumentsField(Field):
     def validate(self, value):
         if self.value is None and self.nullable:
-            return True
+            return
         if type(value) == dict:
             try:
                 json.dumps(value)
-                return True
             except json.JSONDecodeError:
-                raise ValidateError("error: arguments JSONDecodeError")
+                raise ValidationError("error: arguments JSONDecodeError")
         else:
-            raise ValidateError(f"error: arguments bad type {type(value)}")
+            raise ValidationError(f"error: arguments bad type {type(value)}")
 
 
 class EmailField(Field):
     def validate(self, value):
         if value is None and self.nullable:
-            return True
+            return
         if isinstance(value, str):
-            if '@' in value:
-                return True
-            else:
-                raise ValidateError("error: email without @")
-        else:
-            raise ValidateError(f"error: email bad type {type(value)}")
+            if '@' not in value:
+                raise ValidationError("error: email without @")
 
 
 class PhoneField(Field):
     def validate(self, value):
         if value is None and self.nullable:
-            return True
+            return
         if isinstance(value, str):
             if len(value) != 11:
-                raise ValidateError("error: phone length not equal 11")
+                raise ValidationError("error: phone length not equal 11")
             elif value[0] != "7":
-                raise ValidateError("error: phone must start with 7")
+                raise ValidationError("error: phone must start with 7")
             elif not value.isdigit():
-                raise ValidateError("error: phone must be number or string of numbers")
-            else:
-                return True
+                raise ValidationError("error: phone must be number or string of numbers")
         elif isinstance(value, int):
             if str(value)[0] != "7":
-                raise ValidateError("error: phone must start with 7")
+                raise ValidationError("error: phone must start with 7")
             elif len(str(value)) != 11:
-                raise ValidateError("error: phone length not equal 11")
-            else:
-                return True
+                raise ValidationError("error: phone length not equal 11")
         else:
-            raise ValidateError("error: phone bad data type")
-
+            raise ValidationError("error: phone bad data type")
 
 
 class DateField(Field):
     def validate(self, value):
         if value is None and self.nullable:
-            return True
+            return
         try:
             datetime.datetime.strptime(value, '%d.%m.%Y')
-            return True
         except ValueError:
-            raise ValidateError("error: date not in format dd.mm.yyyy")
+            raise ValidationError("error: date not in format dd.mm.yyyy")
 
 
 class BirthDayField(DateField):
     def validate(self, value):
         try:
             super().validate(value=value)
-        except ValidateError:
-            raise ValidateError("error: birthday not in format dd.mm.yyyy")
+        except ValidationError:
+            raise ValidationError("error: birthday not in format dd.mm.yyyy")
         if value is None and self.nullable:
-            return True
+            return
         now_date = datetime.datetime.today().__format__('%d.%m.%Y')
         now_date = datetime.datetime.strptime(now_date, '%d.%m.%Y')
         date_value = datetime.datetime.strptime(value, '%d.%m.%Y')
         if now_date - date_value > datetime.timedelta(days=70 * 365):
-            raise ValidateError("error:  bad birthday You're over 70")
+            raise ValidationError("error:  bad birthday You're over 70")
 
 
 class GenderField(Field):
     def validate(self, value):
         if value is None and self.nullable:
-            return True
-        if value in [0, 1, 2]:
-            return True
-        else:
-            raise ValidateError("error: gender must be 0 or 1 or 2")
+            return
+        if value not in [0, 1, 2]:
+            raise ValidationError("error: gender must be 0 or 1 or 2")
 
 
 class ClientIDsField(Field):
     def validate(self, value):
         if value is None:
             if self.nullable:
-                return True
+                return
             else:
-                raise ValidateError("error: client_ids is empty")
+                raise ValidationError("error: client_ids is empty")
         if type(value) is list:
             if len(value) == 0:
-                raise ValidateError("error: client_ids is empty list")
+                raise ValidationError("error: client_ids is empty list")
             for num in value:
                 if type(num) is not int:
-                    raise ValidateError("error: not number in client_ids")
-            return True
+                    raise ValidationError("error: not number in client_ids")
+            return
         else:
-            raise ValidateError("error: client_ids not list")
+            raise ValidationError("error: client_ids not list")
 
 
 class ClientsInterestsRequest:
@@ -257,7 +242,7 @@ class MethodRequest:
         fields = ["account", "login", "token", "arguments", "method"]
         for field in fields:
             if field not in request_body:
-                raise ValidateError(f"Не хватает поля {field}")
+                raise ValidationError(f"Не хватает поля {field}")
 
     @property
     def is_admin(self):
@@ -298,7 +283,7 @@ def method_handler(request, ctx, store):
                 return ERRORS[NOT_FOUND], NOT_FOUND
         else:
             return ERRORS[FORBIDDEN], FORBIDDEN
-    except (ValidateError, KeyError) as exc:
+    except (ValidationError, KeyError) as exc:
         return ERRORS[INVALID_REQUEST] + " " + str(exc), INVALID_REQUEST
 
 
