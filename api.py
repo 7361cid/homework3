@@ -49,7 +49,12 @@ class Field:
         self.field_name = ""  # для логирования часто используемых типов полей, в этом случае для CharField
 
     def validate(self, value):
-        return value
+        if value is None and self.nullable:
+            return True
+        if value is None and not self.nullable:
+            raise ValidationError(f"error: None in not nullable field")
+        if value is not None:
+            return False
 
     def __set__(self, instance, value):
         self.validate(value)
@@ -58,7 +63,7 @@ class Field:
 
 class CharField(Field):
     def validate(self, value):
-        if value is None and self.nullable:
+        if super().validate(value):
             return
         if not isinstance(value, str):
             raise ValidationError(f"error: {self.field_name} must be string")
@@ -72,7 +77,7 @@ class CharField(Field):
 
 class ArgumentsField(Field):
     def validate(self, value):
-        if self.value is None and self.nullable:
+        if super().validate(value):
             return
         if type(value) == dict:
             try:
@@ -85,7 +90,7 @@ class ArgumentsField(Field):
 
 class EmailField(Field):
     def validate(self, value):
-        if value is None and self.nullable:
+        if super().validate(value):
             return
         if isinstance(value, str):
             if '@' not in value:
@@ -94,7 +99,7 @@ class EmailField(Field):
 
 class PhoneField(Field):
     def validate(self, value):
-        if value is None and self.nullable:
+        if super().validate(value):
             return
         if isinstance(value, str):
             if len(value) != 11:
@@ -114,7 +119,7 @@ class PhoneField(Field):
 
 class DateField(Field):
     def validate(self, value):
-        if value is None and self.nullable:
+        if super().validate(value):
             return
         try:
             datetime.datetime.strptime(value, '%d.%m.%Y')
@@ -139,7 +144,7 @@ class BirthDayField(DateField):
 
 class GenderField(Field):
     def validate(self, value):
-        if value is None and self.nullable:
+        if super().validate(value):
             return
         if value not in [0, 1, 2]:
             raise ValidationError("error: gender must be 0 or 1 or 2")
@@ -147,11 +152,8 @@ class GenderField(Field):
 
 class ClientIDsField(Field):
     def validate(self, value):
-        if value is None:
-            if self.nullable:
-                return
-            else:
-                raise ValidationError("error: client_ids is empty")
+        if super().validate(value):
+            return
         if type(value) is list:
             if len(value) == 0:
                 raise ValidationError("error: client_ids is empty list")
