@@ -7,19 +7,19 @@ import logging
 import hashlib
 import uuid
 from optparse import OptionParser
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import HTTPServer, BaseHTTPRequestHandler, HTTPStatus
 
 from scoring import get_score, get_interests
 
 SALT = "Otus"
 ADMIN_LOGIN = "admin"
 ADMIN_SALT = "42"
-OK = 200
-BAD_REQUEST = 400
-FORBIDDEN = 403
-NOT_FOUND = 404
-INVALID_REQUEST = 422
-INTERNAL_ERROR = 500
+OK = HTTPStatus.OK
+BAD_REQUEST = HTTPStatus.BAD_REQUEST
+FORBIDDEN = HTTPStatus.FORBIDDEN
+NOT_FOUND = HTTPStatus.NOT_FOUND
+INVALID_REQUEST = HTTPStatus.UNPROCESSABLE_ENTITY
+INTERNAL_ERROR = HTTPStatus.INTERNAL_SERVER_ERROR
 ERRORS = {
     BAD_REQUEST: "Bad Request",
     FORBIDDEN: "Forbidden",
