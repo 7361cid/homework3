@@ -181,11 +181,6 @@ class ClientsInterestsRequest:
         self.date = date
         self.init_complete = True
 
-    def find_interests(self):
-        intersts = {}
-        for id in self.client_ids:
-            intersts[str(id)] = get_interests(store=None, cid=id)
-        return intersts
 
 
 class OnlineScoreRequest:
@@ -206,9 +201,6 @@ class OnlineScoreRequest:
         self.gender = gender
         self.init_complete = True
 
-    def find_score(self):
-        return get_score(store=None, phone=self.phone, email=self.email, birthday=self.birthday,
-                         gender=self.gender, first_name=self.first_name, last_name=self.last_name)
 
 
 class MethodRequest:
@@ -273,7 +265,7 @@ def method_handler(request, ctx, store):
                 ClientsInterestsRequest_obj = ClientsInterestsRequest(**MethodRequest_obj.arguments)
                 interests = {}
                 for id in ClientsInterestsRequest_obj.client_ids:
-                    interests[str(id)] = get_interests(store=None, cid=id)
+                    interests[str(id)] = get_interests(store=store, cid=id)
                 return {"interests": interests}, OK
             else:
                 return ERRORS[NOT_FOUND], NOT_FOUND
