@@ -42,11 +42,10 @@ class ValidationError(Exception):
 
 
 class Field:
-    def __init__(self, required, nullable=False, field_name=""):
+    def __init__(self, required, nullable=False):
         self.required = required
         self.nullable = nullable
         self.value = None
-        self.field_name = ""  # для логирования часто используемых типов полей, в этом случае для CharField
 
     def validate(self, value):
         if value is None and self.nullable:
@@ -55,6 +54,9 @@ class Field:
             raise ValidationError(f"error: None in not nullable field")
         if value is not None:
             return False
+
+    def __set_name__(self, owner, name):
+        self.field_name = name
 
     def __set__(self, instance, value):
         self.validate(value)
@@ -82,7 +84,7 @@ class ArgumentsField(Field):
     def validate(self, value):
         if super().validate(value):
             return
-        if type(value) == dict:
+        if isinstance(value, dict):
             try:
                 json.dumps(value)
             except json.JSONDecodeError:
@@ -138,9 +140,9 @@ class BirthDayField(DateField):
             raise ValidationError("error: birthday not in format dd.mm.yyyy")
         if value is None and self.nullable:
             return
-        now_date = datetime.datetime.today().__format__('%d.%m.%Y')
-        now_date = datetime.datetime.strptime(now_date, '%d.%m.%Y')
+        now_date = datetime.datetime.today().date()
         date_value = datetime.datetime.strptime(value, '%d.%m.%Y')
+        date_value = datetime.datetime.date(date_value)
         if now_date - date_value > datetime.timedelta(days=70 * 365):
             raise ValidationError("error:  bad birthday You're over 70")
 
@@ -169,39 +171,30 @@ class ClientIDsField(Field):
 
 
 class ClientsInterestsRequest:
-    init_complete = False
-    client_ids = ClientIDsField(required=True)
-    date = DateField(required=False, nullable=True)
+    client_ids_validator = ClientIDsField(required=True)
+    date_validator = DateField(required=False, nullable=True)
 
     def __init__(self, client_ids=None, date=None):
-        self.client_ids = client_ids
-        self.date = date
+        self.client_ids = self.client_ids_validator = client_ids
+        self.date = self.date_validator = date
         self.init_complete = True
-
-    def find_interests(self):
-        intersts = {}
-        for id in self.client_ids:
-            intersts[str(id)] = get_interests(store=None, cid=id)
-        return intersts
 
 
 class OnlineScoreRequest:
-    init_complete = False
-    first_name = CharField(required=False, nullable=True, field_name="first_name")
-    last_name = CharField(required=False, nullable=True, field_name="last_name")
-    email = EmailField(required=False, nullable=True)
-    phone = PhoneField(required=False, nullable=True)
-    birthday = BirthDayField(required=False, nullable=True)
-    gender = GenderField(required=False, nullable=True)
+    first_name_validator = CharField(required=False, nullable=True)
+    last_name_validator = CharField(required=False, nullable=True)
+    email_validator = EmailField(required=False, nullable=True)
+    phone_validator = PhoneField(required=False, nullable=True)
+    birthday_validator = BirthDayField(required=False, nullable=True)
+    gender_validator = GenderField(required=False, nullable=True)
 
     def __init__(self, first_name=None, last_name=None, email=None, phone=None, birthday=None, gender=None):
-        self.first_name = first_name
-        self.last_name = last_name
-        self.email = email
-        self.phone = phone
-        self.birthday = birthday
-        self.gender = gender
-        self.init_complete = True
+        self.first_name = self.first_name_validator = first_name
+        self.last_name = self.last_name_validator = last_name
+        self.email = self.email_validator = email
+        self.phone = self.phone_validator = phone
+        self.birthday = self.birthday_validator = birthday
+        self.gender = self.gender_validator = gender
 
     def find_score(self):
         return get_score(store=None, phone=self.phone, email=self.email, birthday=self.birthday,
@@ -209,21 +202,18 @@ class OnlineScoreRequest:
 
 
 class MethodRequest:
-    init_complete = False
-    account = CharField(required=False, nullable=True, field_name="account")
-    login = CharField(required=True, nullable=True, field_name="login")
-    token = CharField(required=True, nullable=True, field_name="token")
-    arguments = ArgumentsField(required=True, nullable=True)
-    method = CharField(required=True, nullable=False, field_name="method")
+    account_validator = CharField(required=False, nullable=True)
+    login_validator = CharField(required=True, nullable=True)
+    token_validator = CharField(required=True, nullable=True)
+    arguments_validator = ArgumentsField(required=True, nullable=True)
+    method_validator = CharField(required=True, nullable=False)
 
     def __init__(self, account, login, token, arguments, method):
-        self.account = account
-        self.login = login
-        self.token = token
-        self.arguments = arguments
-        self.method = method
-        self.init_complete = True
-
+        self.account = self.account_validator = account
+        self.login = self.login_validator = login
+        self.token = self.token_validator = token
+        self.arguments = self.arguments_validator = arguments
+        self.method = self.method_validator = method
 
     @staticmethod
     def validate(request_body):
@@ -260,8 +250,8 @@ def method_handler(request, ctx, store):
                 if MethodRequest_obj.is_admin:
                     return {"score": 42}, OK
                 OnlineScoreRequest_obj = OnlineScoreRequest(**MethodRequest_obj.arguments)
-                score = get_score(store=store, phone=OnlineScoreRequest.phone, email=OnlineScoreRequest.email,
-                                  birthday=OnlineScoreRequest_obj.birthday, gender=OnlineScoreRequest.gender,
+                score = get_score(store=store, phone=OnlineScoreRequest_obj.phone, email=OnlineScoreRequest_obj.email,
+                                  birthday=OnlineScoreRequest_obj.birthday, gender=OnlineScoreRequest_obj.gender,
                                   first_name=OnlineScoreRequest_obj.first_name,
                                   last_name=OnlineScoreRequest_obj.last_name)
                 return {"score": score}, OK
