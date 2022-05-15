@@ -8,7 +8,6 @@ import hashlib
 import uuid
 from optparse import OptionParser
 from http.server import HTTPServer, BaseHTTPRequestHandler, HTTPStatus
-
 from scoring import get_score, get_interests
 
 SALT = "Otus"
@@ -46,6 +45,7 @@ class Field:
         self.required = required
         self.nullable = nullable
         self.value = None
+        self.field_name = None
 
     def validate(self, value):
         if value is None and self.nullable:
@@ -60,7 +60,6 @@ class Field:
 
     def __set__(self, instance, value):
         self.validate(value)
-        self.value = value
 
     def __get__(self, instance, owner):
         return self.value
@@ -165,29 +164,41 @@ class ClientIDsField(Field):
             for num in value:
                 if type(num) is not int:
                     raise ValidationError("error: not number in client_ids")
-            return
+            return value
         else:
             raise ValidationError("error: client_ids not list")
 
 
-class ClientsInterestsRequest:
-    client_ids_validator = ClientIDsField(required=True)
-    date_validator = DateField(required=False, nullable=True)
+class Meta(type):
+    def __new__(cls, name, bases, dct, validators_type):
+        new_class = super().__new__(cls, name, bases, dct)
+        if validators_type == 1:
+            new_class.client_ids_validator = ClientIDsField(required=True)
+            new_class.date_validator = DateField(required=False, nullable=True)
+        if validators_type == 2:
+            new_class.last_name_validator = CharField(required=False, nullable=True)
+            new_class.first_name_validator = CharField(required=False, nullable=True)
+            new_class.phone_validator = PhoneField(required=False, nullable=True)
+            new_class.birthday_validator = BirthDayField(required=False, nullable=True)
+            new_class.email_validator = EmailField(required=False, nullable=True)
+            new_class.gender_validator = GenderField(required=False, nullable=True)
+        if validators_type == 3:
+            new_class.account_validator = CharField(required=False, nullable=True)
+            new_class.login_validator = CharField(required=True, nullable=True)
+            new_class.token_validator = CharField(required=True, nullable=True)
+            new_class.arguments_validator = ArgumentsField(required=True, nullable=True)
+            new_class.method_validator = CharField(required=True, nullable=False)
+        return new_class
 
+
+class ClientsInterestsRequest(metaclass=Meta, validators_type=1):
     def __init__(self, client_ids=None, date=None):
         self.client_ids = self.client_ids_validator = client_ids
         self.date = self.date_validator = date
         self.init_complete = True
 
 
-class OnlineScoreRequest:
-    first_name_validator = CharField(required=False, nullable=True)
-    last_name_validator = CharField(required=False, nullable=True)
-    email_validator = EmailField(required=False, nullable=True)
-    phone_validator = PhoneField(required=False, nullable=True)
-    birthday_validator = BirthDayField(required=False, nullable=True)
-    gender_validator = GenderField(required=False, nullable=True)
-
+class OnlineScoreRequest(metaclass=Meta, validators_type=2):
     def __init__(self, first_name=None, last_name=None, email=None, phone=None, birthday=None, gender=None):
         self.first_name = self.first_name_validator = first_name
         self.last_name = self.last_name_validator = last_name
@@ -201,13 +212,7 @@ class OnlineScoreRequest:
                          gender=self.gender, first_name=self.first_name, last_name=self.last_name)
 
 
-class MethodRequest:
-    account_validator = CharField(required=False, nullable=True)
-    login_validator = CharField(required=True, nullable=True)
-    token_validator = CharField(required=True, nullable=True)
-    arguments_validator = ArgumentsField(required=True, nullable=True)
-    method_validator = CharField(required=True, nullable=False)
-
+class MethodRequest(metaclass=Meta, validators_type=3):
     def __init__(self, account, login, token, arguments, method):
         self.account = self.account_validator = account
         self.login = self.login_validator = login
