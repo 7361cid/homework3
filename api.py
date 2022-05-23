@@ -55,15 +55,6 @@ class Field:
         if value is not None:
             return False
 
-    def __set_name__(self, owner, name):
-        self.field_name = name
-
-    def __set__(self, instance, value):
-        self.validate(value)
-
-    def __get__(self, instance, owner):
-        return self.value
-
 
 class CharField(Field):
     def validate(self, value):
@@ -170,55 +161,58 @@ class ClientIDsField(Field):
 
 
 class Meta(type):
-    def __new__(cls, name, bases, dct, validators_type):
+    def __new__(cls, name, bases, dct):
         new_class = super().__new__(cls, name, bases, dct)
-        if validators_type == 1:
-            new_class.client_ids_validator = ClientIDsField(required=True)
-            new_class.date_validator = DateField(required=False, nullable=True)
-        if validators_type == 2:
-            new_class.last_name_validator = CharField(required=False, nullable=True)
-            new_class.first_name_validator = CharField(required=False, nullable=True)
-            new_class.phone_validator = PhoneField(required=False, nullable=True)
-            new_class.birthday_validator = BirthDayField(required=False, nullable=True)
-            new_class.email_validator = EmailField(required=False, nullable=True)
-            new_class.gender_validator = GenderField(required=False, nullable=True)
-        if validators_type == 3:
-            new_class.account_validator = CharField(required=False, nullable=True)
-            new_class.login_validator = CharField(required=True, nullable=True)
-            new_class.token_validator = CharField(required=True, nullable=True)
-            new_class.arguments_validator = ArgumentsField(required=True, nullable=True)
-            new_class.method_validator = CharField(required=True, nullable=False)
+        validators_dict = {"client_ids": ClientIDsField(required=True),
+                           "date": DateField(required=False, nullable=True),
+                           }
+        validators_dict2 = {"first_name": CharField(required=False, nullable=True),
+                            "last_name": CharField(required=False, nullable=True),
+                            "email": EmailField(required=False, nullable=True),
+                            "phone": PhoneField(required=False, nullable=True),
+                            "birthday": BirthDayField(required=False, nullable=True),
+                            "gender": GenderField(required=False, nullable=True),
+                            }
+
+        validators_dict3 = {"account": CharField(required=False, nullable=True),
+                            "login": CharField(required=True, nullable=True),
+                            "token": CharField(required=True, nullable=True),
+                            "arguments": ArgumentsField(required=True, nullable=True),
+                            "birthday": BirthDayField(required=False, nullable=True),
+                            "method": CharField(required=True, nullable=False),
+                            }
+
+        new_class.validators_dict = validators_dict
+        new_class.validators_dict2 = validators_dict2
+        new_class.validators_dict3 = validators_dict3
         return new_class
 
 
-class ClientsInterestsRequest(metaclass=Meta, validators_type=1):
-    def __init__(self, client_ids=None, date=None):
-        self.client_ids = self.client_ids_validator = client_ids
-        self.date = self.date_validator = date
-        self.init_complete = True
+class Request(metaclass=Meta):
+    def __init__(self, validators_dict, **data):
+        for key in validators_dict.keys():
+            validator = validators_dict[key]
+            if key in data.keys():
+                validator.validate(data[key])
+                self.__setattr__(key, data[key])
+            else:
+                validator.validate(None)
+                self.__setattr__(key, None)
 
 
-class OnlineScoreRequest(metaclass=Meta, validators_type=2):
-    def __init__(self, first_name=None, last_name=None, email=None, phone=None, birthday=None, gender=None):
-        self.first_name = self.first_name_validator = first_name
-        self.last_name = self.last_name_validator = last_name
-        self.email = self.email_validator = email
-        self.phone = self.phone_validator = phone
-        self.birthday = self.birthday_validator = birthday
-        self.gender = self.gender_validator = gender
-
-    def find_score(self):
-        return get_score(store=None, phone=self.phone, email=self.email, birthday=self.birthday,
-                         gender=self.gender, first_name=self.first_name, last_name=self.last_name)
+class ClientsInterestsRequest(Request):
+    def __init__(self, **data):
+        super().__init__(self.validators_dict, **data)
 
 
-class MethodRequest(metaclass=Meta, validators_type=3):
-    def __init__(self, account, login, token, arguments, method):
-        self.account = self.account_validator = account
-        self.login = self.login_validator = login
-        self.token = self.token_validator = token
-        self.arguments = self.arguments_validator = arguments
-        self.method = self.method_validator = method
+class OnlineScoreRequest(Request):
+    def __init__(self, **data):
+        super().__init__(self.validators_dict2, **data)
+
+
+class MethodRequest(Request):
+    def __init__(self, **data):
+        super().__init__(self.validators_dict3, **data)
 
     @staticmethod
     def validate(request_body):
