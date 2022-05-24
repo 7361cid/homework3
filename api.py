@@ -41,11 +41,11 @@ class ValidationError(Exception):
 
 
 class Field:
-    def __init__(self, required, nullable=False):
+    def __init__(self, required, nullable=False, field_name=None):
         self.required = required
         self.nullable = nullable
         self.value = None
-        self.field_name = None
+        self.field_name = field_name
 
     def validate(self, value):
         if value is None and self.nullable:
@@ -166,20 +166,20 @@ class Meta(type):
         validators_dict = {"client_ids": ClientIDsField(required=True),
                            "date": DateField(required=False, nullable=True),
                            }
-        validators_dict2 = {"first_name": CharField(required=False, nullable=True),
-                            "last_name": CharField(required=False, nullable=True),
+        validators_dict2 = {"first_name": CharField(required=False, nullable=True, field_name="first_name"),
+                            "last_name": CharField(required=False, nullable=True, field_name="last_name"),
                             "email": EmailField(required=False, nullable=True),
                             "phone": PhoneField(required=False, nullable=True),
                             "birthday": BirthDayField(required=False, nullable=True),
                             "gender": GenderField(required=False, nullable=True),
                             }
 
-        validators_dict3 = {"account": CharField(required=False, nullable=True),
-                            "login": CharField(required=True, nullable=True),
-                            "token": CharField(required=True, nullable=True),
+        validators_dict3 = {"account": CharField(required=False, nullable=True, field_name="account"),
+                            "login": CharField(required=True, nullable=True, field_name="login"),
+                            "token": CharField(required=True, nullable=True, field_name="token"),
                             "arguments": ArgumentsField(required=True, nullable=True),
                             "birthday": BirthDayField(required=False, nullable=True),
-                            "method": CharField(required=True, nullable=False),
+                            "method": CharField(required=True, nullable=False, field_name="method"),
                             }
 
         new_class.validators_dict = validators_dict
