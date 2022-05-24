@@ -90,6 +90,8 @@ class EmailField(Field):
         if isinstance(value, str):
             if '@' not in value:
                 raise ValidationError("error: email without @")
+        else:
+            raise ValidationError(f"error: email bad type {type(value)}")
 
 
 class PhoneField(Field):
