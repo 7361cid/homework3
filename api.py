@@ -10,6 +10,7 @@ import uuid
 import redis
 from optparse import OptionParser
 from http.server import HTTPServer, BaseHTTPRequestHandler, HTTPStatus
+
 from scoring import get_score, get_interests
 
 SALT = "Otus"
