@@ -93,6 +93,8 @@ class EmailField(Field):
         if isinstance(value, str):
             if '@' not in value:
                 raise ValidationError("error: email without @")
+        else:
+            raise ValidationError(f"error: email bad type {type(value)}")
 
 
 class PhoneField(Field):
@@ -244,7 +246,7 @@ class MethodRequest(Request):
             ClientsInterestsRequest_obj = ClientsInterestsRequest(**self.arguments)
             interests = {}
             for id in ClientsInterestsRequest_obj.client_ids:
-                interests[str(id)] = get_interests(store=None, cid=id)
+                interests[str(id)] = get_interests(store=store, cid=id)
             return {"interests": interests}, OK
         else:
             return ERRORS[NOT_FOUND], NOT_FOUND
