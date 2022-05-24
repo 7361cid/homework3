@@ -225,6 +225,27 @@ class MethodRequest(Request):
     def is_admin(self):
         return self.login == ADMIN_LOGIN
 
+    def make_request(self, ctx, store):
+        if self.method == "online_score":
+            if self.is_admin:
+                return {"score": 42}, OK
+            OnlineScoreRequest_obj = OnlineScoreRequest(**self.arguments)
+            score = get_score(store=store, phone=OnlineScoreRequest_obj.phone, email=OnlineScoreRequest_obj.email,
+                              birthday=OnlineScoreRequest_obj.birthday, gender=OnlineScoreRequest_obj.gender,
+                              first_name=OnlineScoreRequest_obj.first_name,
+                              last_name=OnlineScoreRequest_obj.last_name)
+            return {"score": score}, OK
+        elif self.method == "clients_interests":
+            ctx["has"] = sorted(self.arguments.keys())
+            ctx["nclients"] = len(self.arguments["client_ids"])
+            ClientsInterestsRequest_obj = ClientsInterestsRequest(**self.arguments)
+            interests = {}
+            for id in ClientsInterestsRequest_obj.client_ids:
+                interests[str(id)] = get_interests(store=None, cid=id)
+            return {"interests": interests}, OK
+        else:
+            return ERRORS[NOT_FOUND], NOT_FOUND
+
 
 def check_auth(request):
     if request.is_admin:
@@ -245,24 +266,7 @@ def method_handler(request, ctx, store):
                                           method=request_body['method'])
         ctx["has"] = sorted(MethodRequest_obj.arguments.keys())
         if check_auth(MethodRequest_obj):
-            if MethodRequest_obj.method == "online_score":
-                if MethodRequest_obj.is_admin:
-                    return {"score": 42}, OK
-                OnlineScoreRequest_obj = OnlineScoreRequest(**MethodRequest_obj.arguments)
-                score = get_score(store=store, phone=OnlineScoreRequest_obj.phone, email=OnlineScoreRequest_obj.email,
-                                  birthday=OnlineScoreRequest_obj.birthday, gender=OnlineScoreRequest_obj.gender,
-                                  first_name=OnlineScoreRequest_obj.first_name,
-                                  last_name=OnlineScoreRequest_obj.last_name)
-                return {"score": score}, OK
-            elif MethodRequest_obj.method == "clients_interests":
-                ctx["nclients"] = len(MethodRequest_obj.arguments["client_ids"])
-                ClientsInterestsRequest_obj = ClientsInterestsRequest(**MethodRequest_obj.arguments)
-                interests = {}
-                for id in ClientsInterestsRequest_obj.client_ids:
-                    interests[str(id)] = get_interests(store=None, cid=id)
-                return {"interests": interests}, OK
-            else:
-                return ERRORS[NOT_FOUND], NOT_FOUND
+            return MethodRequest_obj.make_request(ctx, store)
         else:
             return ERRORS[FORBIDDEN], FORBIDDEN
     except (ValidationError, KeyError) as exc:
