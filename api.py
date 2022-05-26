@@ -161,7 +161,7 @@ class ClientIDsField(Field):
         else:
             raise ValidationError("error: client_ids not list")
 
-
+"""
 class Meta(type):
     def __new__(cls, name, bases, dct):
         new_class = super().__new__(cls, name, bases, dct)
@@ -188,33 +188,47 @@ class Meta(type):
         new_class.validators_dict2 = validators_dict2
         new_class.validators_dict3 = validators_dict3
         return new_class
+"""
 
 
-class Request(metaclass=Meta):
-    def __init__(self, validators_dict, **data):
-        for key in validators_dict.keys():
-            validator = validators_dict[key]
-            if key in data.keys():
-                validator.validate(data[key])
-                self.__setattr__(key, data[key])
-            else:
-                validator.validate(None)
-                self.__setattr__(key, None)
+class RequestMeta(type):
+    def __new__(mcs, name, bases, attrs):
+        field_list = []
+        for k, v in attrs.items():
+            if isinstance(v, Field):
+                v.field_name = k
+                field_list.append(v)
+        for field in field_list:
+            print(f"Log {field.field_name}")
+        cls = super(RequestMeta, mcs).__new__(mcs, name, bases, attrs)
+        cls.fields = field_list
+        return cls
 
 
-class ClientsInterestsRequest(Request):
-    def __init__(self, **data):
-        super().__init__(self.validators_dict, **data)
+class ClientsInterestsRequest(metaclass=RequestMeta):
+    client_ids = ClientIDsField(required=True)
+    date = DateField(required=False, nullable=True)
 
 
-class OnlineScoreRequest(Request):
-    def __init__(self, **data):
-        super().__init__(self.validators_dict2, **data)
+class OnlineScoreRequest(metaclass=RequestMeta):
+    first_name = CharField(required=False, nullable=True)
+    last_name = CharField(required=False, nullable=True)
+    email = EmailField(required=False, nullable=True)
+    phone = PhoneField(required=False, nullable=True)
+    birthday = BirthDayField(required=False, nullable=True)
+    gender = GenderField(required=False, nullable=True)
 
 
-class MethodRequest(Request):
-    def __init__(self, **data):
-        super().__init__(self.validators_dict3, **data)
+class MethodRequest(metaclass=RequestMeta):
+    account = CharField(required=False, nullable=True)
+    login = CharField(required=True, nullable=True)
+    token = CharField(required=True, nullable=True)
+    arguments = ArgumentsField(required=True, nullable=True)
+    method = CharField(required=True, nullable=False)
+
+    @property
+    def is_admin(self):
+        return self.login == ADMIN_LOGIN
 
     @staticmethod
     def validate(request_body):
