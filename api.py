@@ -198,19 +198,26 @@ class RequestMeta(type):
             if isinstance(v, Field):
                 v.field_name = k
                 field_list.append(v)
-        for field in field_list:
-            print(f"Log {field.field_name}")
         cls = super(RequestMeta, mcs).__new__(mcs, name, bases, attrs)
         cls.fields = field_list
         return cls
 
 
-class ClientsInterestsRequest(metaclass=RequestMeta):
+class BaseRequest:
+    def __init__(self, **kwargs):
+        for key in kwargs:
+            for field in self.fields:
+                if field.field_name == key:
+                    field.validate(kwargs[key])
+                    setattr(self, key, kwargs[key])
+
+
+class ClientsInterestsRequest(BaseRequest, metaclass=RequestMeta):
     client_ids = ClientIDsField(required=True)
     date = DateField(required=False, nullable=True)
 
 
-class OnlineScoreRequest(metaclass=RequestMeta):
+class OnlineScoreRequest(BaseRequest, metaclass=RequestMeta):
     first_name = CharField(required=False, nullable=True)
     last_name = CharField(required=False, nullable=True)
     email = EmailField(required=False, nullable=True)
@@ -219,7 +226,7 @@ class OnlineScoreRequest(metaclass=RequestMeta):
     gender = GenderField(required=False, nullable=True)
 
 
-class MethodRequest(metaclass=RequestMeta):
+class MethodRequest(BaseRequest, metaclass=RequestMeta):
     account = CharField(required=False, nullable=True)
     login = CharField(required=True, nullable=True)
     token = CharField(required=True, nullable=True)
