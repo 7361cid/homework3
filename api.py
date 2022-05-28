@@ -44,11 +44,11 @@ class ValidationError(Exception):
 
 
 class Field:
-    def __init__(self, required, nullable=False, field_name=""):
+    def __init__(self, required, nullable=False, field_name=None):
         self.required = required
         self.nullable = nullable
         self.value = None
-        self.field_name = field_name  # для логирования часто используемых типов полей, в этом случае для CharField
+        self.field_name = field_name
 
     def validate(self, value):
         if value is None and self.nullable:
@@ -57,13 +57,6 @@ class Field:
             raise ValidationError(f"error: None in not nullable field")
         if value is not None:
             return False
-
-    def __set__(self, instance, value):
-        self.validate(value)
-        self.value = value
-
-    def __get__(self, instance, owner):
-        return self.value
 
 
 class CharField(Field):
@@ -84,10 +77,9 @@ class ArgumentsField(Field):
     def validate(self, value):
         if super().validate(value):
             return
-        if type(value) == dict:
+        if isinstance(value, dict):
             try:
                 json.dumps(value)
-                return True
             except json.JSONDecodeError:
                 raise ValidationError("error: arguments JSONDecodeError")
         else:
@@ -101,6 +93,8 @@ class EmailField(Field):
         if isinstance(value, str):
             if '@' not in value:
                 raise ValidationError("error: email without @")
+        else:
+            raise ValidationError(f"error: email bad type {type(value)}")
 
 
 class PhoneField(Field):
@@ -141,9 +135,9 @@ class BirthDayField(DateField):
             raise ValidationError("error: birthday not in format dd.mm.yyyy")
         if value is None and self.nullable:
             return
-        now_date = datetime.datetime.today().__format__('%d.%m.%Y')
-        now_date = datetime.datetime.strptime(now_date, '%d.%m.%Y')
+        now_date = datetime.datetime.today().date()
         date_value = datetime.datetime.strptime(value, '%d.%m.%Y')
+        date_value = datetime.datetime.date(date_value)
         if now_date - date_value > datetime.timedelta(days=70 * 365):
             raise ValidationError("error:  bad birthday You're over 70")
 
@@ -171,54 +165,51 @@ class ClientIDsField(Field):
             raise ValidationError("error: client_ids not list")
 
 
-class ClientsInterestsRequest:
-    init_complete = False
+class RequestMeta(type):
+    def __new__(mcs, name, bases, attrs):
+        field_list = []
+        for k, v in attrs.items():
+            if isinstance(v, Field):
+                v.field_name = k
+                field_list.append(v)
+        cls = super(RequestMeta, mcs).__new__(mcs, name, bases, attrs)
+        cls.fields = field_list
+        return cls
+
+
+class BaseRequest:
+    def __init__(self, **kwargs):
+        for key in kwargs:
+            for field in self.fields:
+                if field.field_name == key:
+                    field.validate(kwargs[key])
+                    setattr(self, key, kwargs[key])
+
+
+class ClientsInterestsRequest(BaseRequest, metaclass=RequestMeta):
     client_ids = ClientIDsField(required=True)
     date = DateField(required=False, nullable=True)
 
-    def __init__(self, client_ids=None, date=None):
-        self.client_ids = client_ids
-        self.date = date
-        self.init_complete = True
 
-
-
-class OnlineScoreRequest:
-    init_complete = False
-    first_name = CharField(required=False, nullable=True, field_name="first_name")
-    last_name = CharField(required=False, nullable=True, field_name="last_name")
+class OnlineScoreRequest(BaseRequest, metaclass=RequestMeta):
+    first_name = CharField(required=False, nullable=True)
+    last_name = CharField(required=False, nullable=True)
     email = EmailField(required=False, nullable=True)
     phone = PhoneField(required=False, nullable=True)
     birthday = BirthDayField(required=False, nullable=True)
     gender = GenderField(required=False, nullable=True)
 
-    def __init__(self, first_name=None, last_name=None, email=None, phone=None, birthday=None, gender=None):
-        self.first_name = first_name
-        self.last_name = last_name
-        self.email = email
-        self.phone = phone
-        self.birthday = birthday
-        self.gender = gender
-        self.init_complete = True
 
-
-
-class MethodRequest:
-    init_complete = False
-    account = CharField(required=False, nullable=True, field_name="account")
-    login = CharField(required=True, nullable=True, field_name="login")
-    token = CharField(required=True, nullable=True, field_name="token")
+class MethodRequest(BaseRequest, metaclass=RequestMeta):
+    account = CharField(required=False, nullable=True)
+    login = CharField(required=True, nullable=True)
+    token = CharField(required=True, nullable=True)
     arguments = ArgumentsField(required=True, nullable=True)
-    method = CharField(required=True, nullable=False, field_name="method")
+    method = CharField(required=True, nullable=False)
 
-    def __init__(self, account, login, token, arguments, method):
-        self.account = account
-        self.login = login
-        self.token = token
-        self.arguments = arguments
-        self.method = method
-        self.init_complete = True
-
+    @property
+    def is_admin(self):
+        return self.login == ADMIN_LOGIN
 
     @staticmethod
     def validate(request_body):
@@ -230,6 +221,27 @@ class MethodRequest:
     @property
     def is_admin(self):
         return self.login == ADMIN_LOGIN
+
+    def make_request(self, ctx, store):
+        if self.method == "online_score":
+            if self.is_admin:
+                return {"score": 42}, OK
+            OnlineScoreRequest_obj = OnlineScoreRequest(**self.arguments)
+            score = get_score(store=store, phone=OnlineScoreRequest_obj.phone, email=OnlineScoreRequest_obj.email,
+                              birthday=OnlineScoreRequest_obj.birthday, gender=OnlineScoreRequest_obj.gender,
+                              first_name=OnlineScoreRequest_obj.first_name,
+                              last_name=OnlineScoreRequest_obj.last_name)
+            return {"score": score}, OK
+        elif self.method == "clients_interests":
+            ctx["has"] = sorted(self.arguments.keys())
+            ctx["nclients"] = len(self.arguments["client_ids"])
+            ClientsInterestsRequest_obj = ClientsInterestsRequest(**self.arguments)
+            interests = {}
+            for id in ClientsInterestsRequest_obj.client_ids:
+                interests[str(id)] = get_interests(store=None, cid=id)
+            return {"interests": interests}, OK
+        else:
+            return ERRORS[NOT_FOUND], NOT_FOUND
 
 
 def check_auth(request):
@@ -251,24 +263,7 @@ def method_handler(request, ctx, store):
                                           method=request_body['method'])
         ctx["has"] = sorted(MethodRequest_obj.arguments.keys())
         if check_auth(MethodRequest_obj):
-            if MethodRequest_obj.method == "online_score":
-                if MethodRequest_obj.is_admin:
-                    return {"score": 42}, OK
-                OnlineScoreRequest_obj = OnlineScoreRequest(**MethodRequest_obj.arguments)
-                score = get_score(store=store, phone=OnlineScoreRequest.phone, email=OnlineScoreRequest.email,
-                                  birthday=OnlineScoreRequest_obj.birthday, gender=OnlineScoreRequest.gender,
-                                  first_name=OnlineScoreRequest_obj.first_name,
-                                  last_name=OnlineScoreRequest_obj.last_name)
-                return {"score": score}, OK
-            elif MethodRequest_obj.method == "clients_interests":
-                ctx["nclients"] = len(MethodRequest_obj.arguments["client_ids"])
-                ClientsInterestsRequest_obj = ClientsInterestsRequest(**MethodRequest_obj.arguments)
-                interests = {}
-                for id in ClientsInterestsRequest_obj.client_ids:
-                    interests[str(id)] = get_interests(store=store, cid=id)
-                return {"interests": interests}, OK
-            else:
-                return ERRORS[NOT_FOUND], NOT_FOUND
+            return MethodRequest_obj.make_request(ctx, store)
         else:
             return ERRORS[FORBIDDEN], FORBIDDEN
     except (ValidationError, KeyError) as exc:
