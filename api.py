@@ -179,11 +179,13 @@ class RequestMeta(type):
 
 class BaseRequest:
     def __init__(self, **kwargs):
-        for key in kwargs:
-            for field in self.fields:
-                if field.field_name == key:
-                    field.validate(kwargs[key])
-                    setattr(self, key, kwargs[key])
+        for field in self.fields:
+            if field.field_name in kwargs:
+                field.validate(kwargs[field.field_name])
+                setattr(self, field.field_name, kwargs[field.field_name])
+            else:
+                field.validate(None)
+                setattr(self, field.field_name, None)
 
 
 class ClientsInterestsRequest(BaseRequest, metaclass=RequestMeta):
@@ -238,7 +240,7 @@ class MethodRequest(BaseRequest, metaclass=RequestMeta):
             ClientsInterestsRequest_obj = ClientsInterestsRequest(**self.arguments)
             interests = {}
             for id in ClientsInterestsRequest_obj.client_ids:
-                interests[str(id)] = get_interests(store=None, cid=id)
+                interests[str(id)] = get_interests(store=store, cid=id)
             return {"interests": interests}, OK
         else:
             return ERRORS[NOT_FOUND], NOT_FOUND
