@@ -176,11 +176,15 @@ class RequestMeta(type):
 
 class BaseRequest:
     def __init__(self, **kwargs):
-        for key in kwargs:
-            for field in self.fields:
-                if field.field_name == key:
-                    field.validate(kwargs[key])
-                    setattr(self, key, kwargs[key])
+        for field in self.fields:
+            if field.field_name in kwargs:
+                setattr(self, field.field_name, kwargs[field.field_name])
+            else:
+                setattr(self, field.field_name, None)
+
+    def validate_data(self):
+        for field in self.fields:
+            field.validate(getattr(self, field.field_name, None))
 
 
 class ClientsInterestsRequest(BaseRequest, metaclass=RequestMeta):
@@ -221,6 +225,7 @@ def make_request(ctx, store, MethodRequest_obj):
         if MethodRequest_obj.is_admin:
             return {"score": 42}, OK
         OnlineScoreRequest_obj = OnlineScoreRequest(**MethodRequest_obj.arguments)
+        OnlineScoreRequest_obj.validate_data()
         score = get_score(store=store, phone=OnlineScoreRequest_obj.phone, email=OnlineScoreRequest_obj.email,
                           birthday=OnlineScoreRequest_obj.birthday, gender=OnlineScoreRequest_obj.gender,
                           first_name=OnlineScoreRequest_obj.first_name,
@@ -230,6 +235,7 @@ def make_request(ctx, store, MethodRequest_obj):
         ctx["has"] = sorted(MethodRequest_obj.arguments.keys())
         ctx["nclients"] = len(MethodRequest_obj.arguments["client_ids"])
         ClientsInterestsRequest_obj = ClientsInterestsRequest(**MethodRequest_obj.arguments)
+        ClientsInterestsRequest_obj.validate_data()
         interests = {}
         for id in ClientsInterestsRequest_obj.client_ids:
             interests[str(id)] = get_interests(store=None, cid=id)
