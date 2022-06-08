@@ -1,3 +1,5 @@
+import os
+import sys
 import hashlib
 import datetime
 import functools
@@ -5,8 +7,12 @@ import unittest
 import logging
 from optparse import OptionParser
 from mock import Mock
+from pathlib import Path
 
+path = str(Path(os.path.abspath(__file__)).parent.parent.parent)
+sys.path.insert(1, path)
 import api
+import store
 
 
 def cases(cases):
@@ -186,11 +192,11 @@ class TestSuite(unittest.TestCase):
 
     @staticmethod
     def mock_method():
-        raise api.RetrieException
+        raise store.RetrieException
 
     @cases([{}])
     def test_no_store_score_request(self, arguments):
-        self.store.get = Mock(side_effect=api.RetrieException)
+        self.store.get = Mock(side_effect=store.RetrieException)
         request = {"account": "horns&hoofs", "login": "h&f", "method": "online_score",
                        "arguments": arguments}
         self.set_valid_auth(request)
@@ -199,8 +205,8 @@ class TestSuite(unittest.TestCase):
 
     @cases([{"client_ids": [0]}])
     def test_no_store_clients_interests(self, arguments):
-        self.store.get = Mock(side_effect=api.RetrieException)
-        with self.assertRaises(api.RetrieException):
+        self.store.get = Mock(side_effect=store.RetrieException)
+        with self.assertRaises(store.RetrieException):
             request = {"account": "horns&hoofs", "login": "h&f", "method": "clients_interests",
                        "arguments": arguments}
             self.set_valid_auth(request)

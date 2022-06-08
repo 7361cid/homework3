@@ -5,13 +5,12 @@ import json
 import datetime
 import logging
 import hashlib
-import time
 import uuid
-import redis
 from optparse import OptionParser
 from http.server import HTTPServer, BaseHTTPRequestHandler, HTTPStatus
 
 from scoring import get_score, get_interests
+from store import Store
 
 SALT = "Otus"
 ADMIN_LOGIN = "admin"
@@ -278,51 +277,11 @@ def method_handler(request, ctx, store):
         return ERRORS[INVALID_REQUEST] + " " + str(exc), INVALID_REQUEST
 
 
-class RetrieException(Exception):
-    pass
-
-
-class Store:
-    """
-    Use Redis-x64-3.0.504
-    """
-    def __init__(self, retries=3, timeout=3):
-        self.redis = redis.StrictRedis(host='localhost', port=6379, db=0, connection_pool=None)
-        self.retries = retries
-        self.timeout = timeout
-
-    def set(self, key, value):
-        return self.redis.set(key, value)
-
-    def get(self, key):
-        retries = self.retries
-        while retries:
-            try:
-                return self.redis.get(key)
-            except redis.exceptions.ConnectionError:
-                time.sleep(self.timeout)
-                retries -= 1
-        raise RetrieException
-
-    def cache_get(self, key):
-        """
-        Отрабатывает в любом случае
-        """
-        try:
-            self.get(key)
-        except RetrieException:
-            return 0
-
-    def cache_set(self, key, value, time):
-        self.set(key, value)
-
-
 class MainHTTPHandler(BaseHTTPRequestHandler):
     router = {
         "method": method_handler
     }
     store = Store()
-
 
     def get_request_id(self, headers):
         return headers.get('HTTP_X_REQUEST_ID', uuid.uuid4().hex)
@@ -364,7 +323,7 @@ class MainHTTPHandler(BaseHTTPRequestHandler):
         return
 
 
-if __name__ == "__main__":
+def main():
     op = OptionParser()
     op.add_option("-p", "--port", action="store", type=int, default=8080)
     op.add_option("-l", "--log", action="store", default=None)
@@ -378,3 +337,7 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         pass
     server.server_close()
+
+
+if __name__ == "__main__":
+    main()
