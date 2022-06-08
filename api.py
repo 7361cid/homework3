@@ -212,13 +212,6 @@ class MethodRequest(BaseRequest, metaclass=RequestMeta):
     def is_admin(self):
         return self.login == ADMIN_LOGIN
 
-    @staticmethod
-    def validate(request_body):
-        fields = ["account", "login", "token", "arguments", "method"]
-        for field in fields:
-            if field not in request_body:
-                raise ValidationError(f"Не хватает поля {field}")
-
 
 def make_request(ctx, store, MethodRequest_obj):
     if MethodRequest_obj.method == "online_score":
@@ -257,7 +250,6 @@ def check_auth(request):
 def method_handler(request, ctx, store):
     try:
         request_body = request['body']
-        MethodRequest.validate(request_body)
         MethodRequest_obj = MethodRequest(account=request_body['account'], login=request_body['login'],
                                           token=request_body['token'], arguments=request_body['arguments'],
                                           method=request_body['method'])
