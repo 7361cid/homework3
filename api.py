@@ -180,11 +180,13 @@ class BaseRequest:
     def __init__(self, **kwargs):
         for field in self.fields:
             if field.field_name in kwargs:
-                field.validate(kwargs[field.field_name])
                 setattr(self, field.field_name, kwargs[field.field_name])
             else:
-                field.validate(None)
                 setattr(self, field.field_name, None)
+
+    def validate_data(self):
+        for field in self.fields:
+            field.validate(getattr(self, field.field_name, None))
 
 
 class ClientsInterestsRequest(BaseRequest, metaclass=RequestMeta):
@@ -231,7 +233,7 @@ def make_request(ctx, store, MethodRequest_obj):
         ClientsInterestsRequest_obj.validate_data()
         interests = {}
         for id in ClientsInterestsRequest_obj.client_ids:
-            interests[str(id)] = get_interests(store=None, cid=id)
+            interests[str(id)] = get_interests(store=store, cid=id)
         return {"interests": interests}, OK
     else:
         return ERRORS[NOT_FOUND], NOT_FOUND
