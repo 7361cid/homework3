@@ -305,7 +305,7 @@ class MainHTTPHandler(BaseHTTPRequestHandler):
         self.send_response(code)
         self.send_header("Content-Type", "application/json")
         self.end_headers()
-        if type(response) == bytes:  # Иначе ошибка json.dumps
+        if type(response) == bytes:
             response = response.decode(encoding="utf-8")
         if code not in ERRORS:
             r = {"response": response, "code": code}
@@ -313,7 +313,7 @@ class MainHTTPHandler(BaseHTTPRequestHandler):
             r = {"error": response or ERRORS.get(code, "Unknown Error"), "code": code}
         context.update(r)
         logging.info(context)
-        self.wfile.write(json.dumps(r).encode(encoding="utf-8"))  # Иначе ошибка отправки через сокет
+        self.wfile.write(json.dumps(r).encode(encoding="utf-8"))
         return
 
 

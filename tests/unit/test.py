@@ -45,6 +45,7 @@ class TestSuite(unittest.TestCase):
         self.store.set(key="i:3", value="running")
 
     def get_response(self, request):
+        print(f"LOG request {request} \n\n  LOG headers  {self.headers} \n\n")
         return api.method_handler({"body": request, "headers": self.headers}, self.context, self.store)
 
     def set_valid_auth(self, request):
@@ -215,7 +216,6 @@ class TestSuite(unittest.TestCase):
 
 if __name__ == "__main__":
     op = OptionParser()
-    op.add_option("-p", "--port", action="store", type=int, default=8080)
     op.add_option("-l", "--log", action="store", default=None)
     (opts, args) = op.parse_args()
     logging.basicConfig(filename=opts.log, level=logging.INFO,
