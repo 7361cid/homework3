@@ -153,13 +153,13 @@ class ClientIDsField(Field):
     def validate(self, value):
         if super().validate(value):
             return
-        if type(value) is list:
+        if isinstance(value, list):
             if len(value) == 0:
                 raise ValidationError("error: client_ids is empty list")
             for num in value:
-                if type(num) is not int:
+                if not isinstance(num, int):
                     raise ValidationError("error: not number in client_ids")
-            return
+            return value
         else:
             raise ValidationError("error: client_ids not list")
 
@@ -212,37 +212,29 @@ class MethodRequest(BaseRequest, metaclass=RequestMeta):
     def is_admin(self):
         return self.login == ADMIN_LOGIN
 
-    @staticmethod
-    def validate(request_body):
-        fields = ["account", "login", "token", "arguments", "method"]
-        for field in fields:
-            if field not in request_body:
-                raise ValidationError(f"Не хватает поля {field}")
 
-    @property
-    def is_admin(self):
-        return self.login == ADMIN_LOGIN
-
-    def make_request(self, ctx, store):
-        if self.method == "online_score":
-            if self.is_admin:
-                return {"score": 42}, OK
-            OnlineScoreRequest_obj = OnlineScoreRequest(**self.arguments)
-            score = get_score(store=store, phone=OnlineScoreRequest_obj.phone, email=OnlineScoreRequest_obj.email,
-                              birthday=OnlineScoreRequest_obj.birthday, gender=OnlineScoreRequest_obj.gender,
-                              first_name=OnlineScoreRequest_obj.first_name,
-                              last_name=OnlineScoreRequest_obj.last_name)
-            return {"score": score}, OK
-        elif self.method == "clients_interests":
-            ctx["has"] = sorted(self.arguments.keys())
-            ctx["nclients"] = len(self.arguments["client_ids"])
-            ClientsInterestsRequest_obj = ClientsInterestsRequest(**self.arguments)
-            interests = {}
-            for id in ClientsInterestsRequest_obj.client_ids:
-                interests[str(id)] = get_interests(store=store, cid=id)
-            return {"interests": interests}, OK
-        else:
-            return ERRORS[NOT_FOUND], NOT_FOUND
+def make_request(ctx, store, MethodRequest_obj):
+    if MethodRequest_obj.method == "online_score":
+        if MethodRequest_obj.is_admin:
+            return {"score": 42}, OK
+        OnlineScoreRequest_obj = OnlineScoreRequest(**MethodRequest_obj.arguments)
+        OnlineScoreRequest_obj.validate_data()
+        score = get_score(store=store, phone=OnlineScoreRequest_obj.phone, email=OnlineScoreRequest_obj.email,
+                          birthday=OnlineScoreRequest_obj.birthday, gender=OnlineScoreRequest_obj.gender,
+                          first_name=OnlineScoreRequest_obj.first_name,
+                          last_name=OnlineScoreRequest_obj.last_name)
+        return {"score": score}, OK
+    elif MethodRequest_obj.method == "clients_interests":
+        ctx["has"] = sorted(MethodRequest_obj.arguments.keys())
+        ctx["nclients"] = len(MethodRequest_obj.arguments["client_ids"])
+        ClientsInterestsRequest_obj = ClientsInterestsRequest(**MethodRequest_obj.arguments)
+        ClientsInterestsRequest_obj.validate_data()
+        interests = {}
+        for id in ClientsInterestsRequest_obj.client_ids:
+            interests[str(id)] = get_interests(store=None, cid=id)
+        return {"interests": interests}, OK
+    else:
+        return ERRORS[NOT_FOUND], NOT_FOUND
 
 
 def check_auth(request):
@@ -258,13 +250,12 @@ def check_auth(request):
 def method_handler(request, ctx, store):
     try:
         request_body = request['body']
-        MethodRequest.validate(request_body)
         MethodRequest_obj = MethodRequest(account=request_body['account'], login=request_body['login'],
                                           token=request_body['token'], arguments=request_body['arguments'],
                                           method=request_body['method'])
         ctx["has"] = sorted(MethodRequest_obj.arguments.keys())
         if check_auth(MethodRequest_obj):
-            return MethodRequest_obj.make_request(ctx, store)
+            return make_request(ctx, store, MethodRequest_obj)
         else:
             return ERRORS[FORBIDDEN], FORBIDDEN
     except (ValidationError, KeyError) as exc:
@@ -305,7 +296,7 @@ class MainHTTPHandler(BaseHTTPRequestHandler):
         self.send_response(code)
         self.send_header("Content-Type", "application/json")
         self.end_headers()
-        if type(response) == bytes:
+        if isinstance(response, bytes):  # Иначе ошибка json.dumps
             response = response.decode(encoding="utf-8")
         if code not in ERRORS:
             r = {"response": response, "code": code}
