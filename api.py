@@ -101,12 +101,13 @@ class PhoneField(Field):
         if super().validate(value):
             return
         if isinstance(value, str):
-            if len(value) != 11:
+            if not value.isdigit():
+                raise ValidationError("error: phone must be number or string of numbers")
+            elif len(value) != 11:
                 raise ValidationError("error: phone length not equal 11")
             elif value[0] != "7":
                 raise ValidationError("error: phone must start with 7")
-            elif not value.isdigit():
-                raise ValidationError("error: phone must be number or string of numbers")
+
         elif isinstance(value, int):
             if str(value)[0] != "7":
                 raise ValidationError("error: phone must start with 7")
