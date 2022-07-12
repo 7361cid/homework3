@@ -2,16 +2,48 @@ import os
 import sys
 import unittest
 import requests
+import redis
 from threading import Thread
-
+from unittest import mock
 from pathlib import Path
 
 path = str(Path(os.path.abspath(__file__)).parent.parent.parent)
 sys.path.insert(1, path)
 import api
+import store
 
 
-class TestSuite(unittest.TestCase):
+class TestStore(unittest.TestCase):
+    def setUp(self):
+        self.store = store.Store()
+
+    def test_set_get_value(self):
+        self.store.set(key="key", value=1)
+        self.assertEqual(int(self.store.get(key="key").decode("utf-8")), 1)
+
+    @staticmethod
+    def error(key):
+        raise redis.exceptions.ConnectionError()
+
+    @mock.patch('store.Store._get')
+    def test_retries(self, mock_obj):
+        self.assertEqual(self.store.retries, 3)
+        mock_obj.side_effect = self.error
+        self.store.set(key="key", value=1)
+        with self.assertRaises(store.RetrieException):
+            self.store.get(key="key")
+        self.assertEqual(self.store.retries, 3)
+
+    @mock.patch('store.Store._get')
+    def test_cache_get(self, mock_obj):
+        self.assertEqual(self.store.retries, 3)
+        mock_obj.side_effect = self.error
+        self.store.set(key="key", value=1)
+        value = self.store.cache_get(key="key")
+        self.assertEqual(value, 0)
+
+
+class TestServer(unittest.TestCase):
     def setUp(self):
         thread1 = Thread(target=api.main)
         thread1.start()

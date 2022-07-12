@@ -1,6 +1,7 @@
 import redis
 import time
 
+
 class RetrieException(Exception):
     pass
 
@@ -17,11 +18,14 @@ class Store:
     def set(self, key, value):
         return self.redis.set(key, value)
 
+    def _get(self, key):
+        return self.redis.get(key)
+
     def get(self, key):
         retries = self.retries
         while retries:
             try:
-                return self.redis.get(key)
+                return self._get(key)
             except redis.exceptions.ConnectionError:
                 time.sleep(self.timeout)
                 retries -= 1

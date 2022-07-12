@@ -184,6 +184,27 @@ class TestFields(unittest.TestCase):
             arguments_field_object.validate('')
         self.assertTrue("error: client_ids not list" in str(exc.exception))
 
+    def test_client_ids_field_value2(self):
+        arguments_field_object = api.ClientIDsField(required=True)
+        with self.assertRaises(api.ValidationError) as exc:
+            arguments_field_object.validate([])
+        self.assertTrue("error: client_ids is empty list" in str(exc.exception))
+
+    def test_client_ids_field_value3(self):
+        arguments_field_object = api.ClientIDsField(required=True)
+        with self.assertRaises(api.ValidationError) as exc:
+            arguments_field_object.validate(['a'])
+        self.assertTrue("error: not number in client_ids" in str(exc.exception))
+
+    def test_client_ids_field_nullable_false(self):
+        arguments_field_object = api.ClientIDsField(required=True)
+        with self.assertRaises(api.ValidationError):
+            arguments_field_object.validate(None)
+
+    def test_client_ids_field_nullable_true(self):
+        arguments_field_object = api.ClientIDsField(required=True, nullable=True)
+        arguments_field_object.validate(None)
+
 
 class TestSuite(unittest.TestCase):
     def setUp(self):
@@ -197,7 +218,6 @@ class TestSuite(unittest.TestCase):
         self.store.set(key="i:3", value="running")
 
     def get_response(self, request):
-        print(f"LOG request {request} \n\n  LOG headers  {self.headers} \n\n")
         return api.method_handler({"body": request, "headers": self.headers}, self.context, self.store)
 
     def set_valid_auth(self, request):
