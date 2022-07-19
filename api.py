@@ -6,11 +6,16 @@ import datetime
 import logging
 import hashlib
 import uuid
+import os
 from optparse import OptionParser
 from http.server import HTTPServer, BaseHTTPRequestHandler, HTTPStatus
-
-from scoring import get_score, get_interests
-from store import Store
+from pathlib import Path
+from importlib.machinery import SourceFileLoader
+file = "scoring.py"
+file2 = "store.py"
+folder = str(Path(os.path.abspath(__file__)).parent)
+scoring = SourceFileLoader(file, folder + f"/{file}").load_module()
+store = SourceFileLoader(file2, folder + f"/{file2}").load_module()
 
 SALT = "Otus"
 ADMIN_LOGIN = "admin"
@@ -222,10 +227,10 @@ def make_request(ctx, store, MethodRequest_obj):
             return {"score": 42}, OK
         OnlineScoreRequest_obj = OnlineScoreRequest(**MethodRequest_obj.arguments)
         OnlineScoreRequest_obj.validate_data()
-        score = get_score(store=store, phone=OnlineScoreRequest_obj.phone, email=OnlineScoreRequest_obj.email,
-                          birthday=OnlineScoreRequest_obj.birthday, gender=OnlineScoreRequest_obj.gender,
-                          first_name=OnlineScoreRequest_obj.first_name,
-                          last_name=OnlineScoreRequest_obj.last_name)
+        score = scoring.get_score(store=store, phone=OnlineScoreRequest_obj.phone, email=OnlineScoreRequest_obj.email,
+                                  birthday=OnlineScoreRequest_obj.birthday, gender=OnlineScoreRequest_obj.gender,
+                                  first_name=OnlineScoreRequest_obj.first_name,
+                                  last_name=OnlineScoreRequest_obj.last_name)
         return {"score": score}, OK
     elif MethodRequest_obj.method == "clients_interests":
         ctx["has"] = sorted(MethodRequest_obj.arguments.keys())
@@ -234,7 +239,7 @@ def make_request(ctx, store, MethodRequest_obj):
         ClientsInterestsRequest_obj.validate_data()
         interests = {}
         for id in ClientsInterestsRequest_obj.client_ids:
-            interests[str(id)] = get_interests(store=store, cid=id)
+            interests[str(id)] = scoring.get_interests(store=store, cid=id)
         return {"interests": interests}, OK
     else:
         return ERRORS[NOT_FOUND], NOT_FOUND
@@ -269,7 +274,7 @@ class MainHTTPHandler(BaseHTTPRequestHandler):
     router = {
         "method": method_handler
     }
-    store = Store()
+    store = store.Store()
 
     def get_request_id(self, headers):
         return headers.get('HTTP_X_REQUEST_ID', uuid.uuid4().hex)

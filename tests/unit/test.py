@@ -1,5 +1,4 @@
 import os
-import sys
 import hashlib
 import datetime
 import functools
@@ -7,15 +6,17 @@ import unittest
 import logging
 import json
 from optparse import OptionParser
-
+from importlib.machinery import SourceFileLoader
 from mock import Mock
 from pathlib import Path
 from unittest import mock as uMock
 
-path = str(Path(os.path.abspath(__file__)).parent.parent.parent)
-sys.path.insert(1, path)
-import api
-import store
+# Импорт без затрагивания sys.path
+file = "api.py"
+file2 = "store.py"
+folder = str(Path(os.path.abspath(__file__)).parent.parent.parent)
+store = SourceFileLoader(file2, folder + f"/{file2}").load_module()
+api = SourceFileLoader(file, folder + f"/{file}").load_module()
 
 
 def cases(cases):
@@ -210,7 +211,7 @@ class TestSuite(unittest.TestCase):
     def setUp(self):
         self.context = {}
         self.headers = {}
-        self.store = api.Store()
+        self.store = store.Store()
         # заполнение данными для теста метода get_interests
         self.store.set(key="i:0", value="writing")
         self.store.set(key="i:1", value="reading")
