@@ -18,14 +18,16 @@ class Store:
     def set(self, key, value):
         return self.redis.set(key, value)
 
-    def _get(self, key):
-        return self.redis.get(key)
-
     def get(self, key):
         retries = self.retries
         while retries:
             try:
-                return self._get(key)
+                value = self.redis.get(key)
+                if value is not None:
+                    return self.redis.get(key)
+                else:
+                    time.sleep(self.timeout)
+                    retries -= 1
             except redis.exceptions.ConnectionError:
                 time.sleep(self.timeout)
                 retries -= 1
@@ -36,7 +38,7 @@ class Store:
         Отрабатывает в любом случае
         """
         try:
-            self.get(key)
+            return self.get(key)
         except RetrieException:
             return 0
 
