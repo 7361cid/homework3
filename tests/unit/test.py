@@ -15,7 +15,7 @@ store = SourceFileLoader(file2, folder + f"/{file2}").load_module()
 api = SourceFileLoader(file, folder + f"/{file}").load_module()
 
 
-class TestFields(unittest.TestCase):
+class TestCharField(unittest.TestCase):
     def test_char_field_value(self):
         char_field_object = api.CharField(required=True, field_name="char_field_object")
         with self.assertRaises(api.ValidationError) as exc:
@@ -31,6 +31,8 @@ class TestFields(unittest.TestCase):
         char_field_object = api.CharField(required=True, nullable=True, field_name="char_field_object")
         char_field_object.validate(None)
 
+
+class TestEmailField(unittest.TestCase):
     def test_email_field_value(self):
         email_field_object = api.EmailField(required=True, field_name="email_field_object")
         with self.assertRaises(api.ValidationError) as exc:
@@ -52,6 +54,8 @@ class TestFields(unittest.TestCase):
         char_field_object = api.EmailField(required=True, nullable=True, field_name="email_field_object")
         char_field_object.validate(None)
 
+
+class TestPhoneField(unittest.TestCase):
     def test_phone_field_value(self):
         phone_field_object = api.PhoneField(required=True, field_name="phone_field_object")
         with self.assertRaises(api.ValidationError) as exc:
@@ -79,6 +83,8 @@ class TestFields(unittest.TestCase):
         phone_field_object = api.EmailField(required=True, nullable=True, field_name="phone_field_object")
         phone_field_object.validate(None)
 
+
+class TestDateField(unittest.TestCase):
     def test_date_field_value(self):
         date_field_object = api.DateField(required=True, field_name="date_field_object")
         with self.assertRaises(api.ValidationError) as exc:
@@ -94,6 +100,8 @@ class TestFields(unittest.TestCase):
         date_field_object = api.DateField(required=True, nullable=True, field_name="date_field_object")
         date_field_object.validate(None)
 
+
+class TestBirthDayField(unittest.TestCase):
     def test_birthday_field_value(self):
         birthday_field_object = api.BirthDayField(required=True, field_name="birthday_field_object")
         with self.assertRaises(api.ValidationError) as exc:
@@ -105,7 +113,7 @@ class TestFields(unittest.TestCase):
         with self.assertRaises(api.ValidationError) as exc:
             birthday_field_object.validate('10.10.1900')
         self.assertTrue("bad birthday You're over 70" in str(exc.exception))
-    
+
     def test_birthday_field_nullable_false(self):
         birthday_field_object = api.BirthDayField(required=True, field_name="birthday_field_object")
         with self.assertRaises(api.ValidationError):
@@ -115,6 +123,8 @@ class TestFields(unittest.TestCase):
         birthday_field_object = api.BirthDayField(required=True, nullable=True, field_name="birthday_field_object")
         birthday_field_object.validate(None)
 
+
+class TestGenderField(unittest.TestCase):
     def test_gender_field_value(self):
         gender_field_object = api.GenderField(required=True)
         with self.assertRaises(api.ValidationError) as exc:
@@ -130,6 +140,8 @@ class TestFields(unittest.TestCase):
         gender_field_object = api.GenderField(required=True, nullable=True)
         gender_field_object.validate(None)
 
+
+class TestArgumentsField(unittest.TestCase):
     def test_arguments_field_value(self):
         arguments_field_object = api.ArgumentsField(required=True)
         with self.assertRaises(api.ValidationError) as exc:
@@ -157,6 +169,8 @@ class TestFields(unittest.TestCase):
         arguments_field_object = api.ArgumentsField(required=True, nullable=True)
         arguments_field_object.validate(None)
 
+
+class TestClientIDsField(unittest.TestCase):
     def test_client_ids_field_value(self):
         arguments_field_object = api.ClientIDsField(required=True)
         with self.assertRaises(api.ValidationError) as exc:
@@ -183,7 +197,6 @@ class TestFields(unittest.TestCase):
     def test_client_ids_field_nullable_true(self):
         arguments_field_object = api.ClientIDsField(required=True, nullable=True)
         arguments_field_object.validate(None)
-
 
 
 if __name__ == "__main__":
