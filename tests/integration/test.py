@@ -146,8 +146,6 @@ class TestSuite(unittest.TestCase):
         response, code = self.get_response(request)
         self.assertEqual(api.OK, code, arguments)
         score = response.get("score")
-        print(f"Log test_ok_score_request score {score} \n response {response} \n "
-              f"score.decode() {score.decode()} \n type(score.decode()) {type(score.decode())} \n")
         self.assertTrue(float(score.decode()) >= 0)
         self.assertEqual(sorted(self.context["has"]), sorted(arguments.keys()))
 
